@@ -43,6 +43,7 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy
+      - run: pytest tests/scripts
 
   owasp-suite:
     name: OWASP API Top 10 suite (${{ matrix.mode }} target)

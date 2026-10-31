@@ -32,6 +32,7 @@ packages = ["apisec_suite"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/api"]
+pythonpath = ["."]
 addopts = "-ra --strict-markers --strict-config"
 junit_family = "xunit1"
 filterwarnings = ["error"]
@@ -63,4 +64,5 @@ ignore = ["S101"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["apisec_suite", "scripts", "tests/api"]
+explicit_package_bases = true
+files = ["apisec_suite", "scripts", "tests/api", "tests/scripts"]

@@ -1,16 +1,18 @@
 import base64
 import json
 import secrets
+import uuid
 
 import httpx
 import pytest
 
-from apisec_suite.client import Account, bearer, claims, now, sign_hs256, unsigned_token
+from apisec_suite.client import SPRAY_FAILURES_PER_ADDRESS, Account, bearer, claims, now, sign_hs256, unsigned_token
 from apisec_suite.settings import Settings
 
 pytestmark = pytest.mark.api2
 
 ME = "/api/v1/users/me"
+LOGIN = "/api/v1/auth/login"
 
 
 def test_requests_without_a_token_are_rejected(client: httpx.Client) -> None:
@@ -58,6 +60,59 @@ def test_repeated_failed_logins_lock_the_account(client: httpx.Client, user: Acc
 
     assert locked.status_code == 429
     assert locked.headers.get("retry-after")
+
+
+def test_failed_logins_from_another_address_do_not_lock_the_admin_out(
+    client: httpx.Client, client_from_new_address: httpx.Client, settings: Settings
+) -> None:
+    attacker = client_from_new_address
+    for attempt in range(5):
+        response = attacker.post(LOGIN, json={"username": "admin", "password": f"wrong-{attempt}"})
+        assert response.status_code == 401
+
+    admin = client.post(LOGIN, json={"username": "admin", "password": settings.admin_password})
+    attacker_retry = attacker.post(LOGIN, json={"username": "admin", "password": settings.admin_password})
+
+    assert admin.status_code == 200
+    assert attacker_retry.status_code == 429
+
+
+def test_repeated_failed_logins_from_one_address_are_throttled_across_accounts(
+    client: httpx.Client, client_from_new_address: httpx.Client, settings: Settings, user: Account
+) -> None:
+    sprayer = client_from_new_address
+    for _ in range(settings.login_failure_limit):
+        response = sprayer.post(LOGIN, json={"username": f"ghost-{uuid.uuid4().hex[:8]}", "password": "x" * 16})
+        assert response.status_code == 401
+
+    throttled = sprayer.post(LOGIN, json={"username": user.username, "password": user.password})
+    elsewhere = client.post(LOGIN, json={"username": user.username, "password": user.password})
+
+    assert throttled.status_code == 429
+    assert throttled.json()["error"] == "rate_limited"
+    assert int(throttled.headers.get("retry-after", "0")) > 0
+    assert elsewhere.status_code == 200
+
+
+def test_failures_spread_across_addresses_throttle_the_account_for_new_addresses_only(
+    client: httpx.Client,
+    account_ceiling_sprayers: list[httpx.Client],
+    client_from_new_address: httpx.Client,
+    settings: Settings,
+    user: Account,
+) -> None:
+    for index in range(settings.account_failure_limit):
+        sprayer = account_ceiling_sprayers[index // SPRAY_FAILURES_PER_ADDRESS]
+        response = sprayer.post(LOGIN, json={"username": user.username, "password": f"wrong-{index}"})
+        assert response.status_code == 401
+
+    from_new_address = client_from_new_address.post(LOGIN, json={"username": user.username, "password": user.password})
+    from_known_address = client.post(LOGIN, json={"username": user.username, "password": user.password})
+
+    assert from_new_address.status_code == 429
+    assert from_new_address.json()["error"] == "account_throttled"
+    assert 0 < int(from_new_address.headers.get("retry-after", "0")) <= 3600
+    assert from_known_address.status_code == 200
 
 
 def test_login_errors_do_not_reveal_whether_the_account_exists(client: httpx.Client, user: Account) -> None:

@@ -76,12 +76,13 @@ export function parseOrderItems(input: unknown, strict: boolean): OrderItem[] {
     const item = asObject(raw);
     const sku = item.sku;
     const quantity = item.quantity;
-    if (typeof sku !== 'string' || !(sku in catalog)) throw badRequest('Unknown sku');
+    const unitPriceCents = typeof sku === 'string' ? catalog.get(sku) : undefined;
+    if (typeof sku !== 'string' || unitPriceCents === undefined) throw badRequest('Unknown sku');
     if (typeof quantity !== 'number' || !Number.isInteger(quantity)) throw badRequest('quantity must be an integer');
     if (strict && (quantity < 1 || quantity > MAX_ITEM_QUANTITY)) {
       throw badRequest(`quantity must be between 1 and ${MAX_ITEM_QUANTITY}`);
     }
-    return { sku, quantity, unitPriceCents: catalog[sku] ?? 0 };
+    return { sku, quantity, unitPriceCents };
   });
 }
 

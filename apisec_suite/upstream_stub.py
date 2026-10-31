@@ -17,6 +17,9 @@ def _partner(partner_id: str, name: str, website: str, discount: int, **extra: A
     return {"id": partner_id, "name": name, "website": website, "discountPercent": discount, **extra}
 
 
+INTERNAL_FAILURE_DETAIL = "connect ECONNREFUSED 10.20.30.40:5432 (files-db-primary)"
+
+
 class UpstreamHandler(BaseHTTPRequestHandler):
     api_origin = "http://127.0.0.1:3000"
 
@@ -72,6 +75,8 @@ class UpstreamHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return None
+        if url.path == "/files/broken.txt":
+            return self._json({"error": "internal", "detail": INTERNAL_FAILURE_DETAIL}, status=500)
         if url.path == "/redirect":
             return self._redirect(parse_qs(url.query).get("to", ["/"])[0])
         match = re.fullmatch(r"/partners/([a-z0-9-]+)", url.path)

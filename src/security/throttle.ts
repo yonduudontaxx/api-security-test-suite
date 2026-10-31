@@ -13,6 +13,13 @@ export class FixedWindowLimiter {
     this.windowMs = windowMs;
   }
 
+  peek(key: string, now = Date.now()): ThrottleDecision {
+    const current = this.windows.get(key);
+    if (!current || now - current.startedAt >= this.windowMs) return { allowed: true, retryAfterSeconds: 0 };
+    const retryAfterSeconds = Math.ceil((current.startedAt + this.windowMs - now) / 1000);
+    return { allowed: current.count < this.limit, retryAfterSeconds };
+  }
+
   hit(key: string, now = Date.now()): ThrottleDecision {
     const current = this.windows.get(key);
     const window = current && now - current.startedAt < this.windowMs ? current : { startedAt: now, count: 0 };

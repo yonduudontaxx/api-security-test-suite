@@ -51,11 +51,11 @@ flowchart LR
 | OWASP API 2023 | Seeded flaw (`vulnerable`) | Tests | Fix (`hardened`) |
 | --- | --- | --- | --- |
 | **API1** Broken Object Level Authorization | Orders are fetched, cancelled and discounted by ID with no owner check, and `?ownerId=` lists another user's orders | [`test_api01_bola.py`](tests/api/test_api01_bola.py) | Lookups are scoped to the caller (or admin). Foreign IDs return `404`, not `403`, so IDs cannot be enumerated |
-| **API2** Broken Authentication | Accepts `alg=none` in any casing, ignores `exp`, has no login lockout, and returns different errors for unknown users and wrong passwords | [`test_api02_broken_authentication.py`](tests/api/test_api02_broken_authentication.py) | Pins HS256, compares signatures in constant time, requires `exp`/`iat` and rejects future `iat`, locks an account for 15 minutes after 5 failures, and gives one generic error |
+| **API2** Broken Authentication | Accepts `alg=none` in any casing, ignores `exp`, has no login lockout, and returns different errors for unknown users and wrong passwords | [`test_api02_broken_authentication.py`](tests/api/test_api02_broken_authentication.py) | Pins HS256, compares signatures in constant time, requires `exp`/`iat` and rejects future `iat`, locks an account for 15 minutes after 5 failures from the same address (so an attacker elsewhere cannot lock the owner out), throttles each address after 20 failed logins a minute across all accounts, throttles an account for addresses it has never logged in from after 50 failures an hour from anywhere, and gives one generic error |
 | **API3** Broken Object Property Level Authorization | Responses include `passwordHash`, `resetToken` and `mfaSecret`. `PATCH /users/me` and register accept `role` and `balanceCents` | [`test_api03_bopla.py`](tests/api/test_api03_bopla.py) | Separate private and public views, plus input allowlists that reject unknown fields |
 | **API4** Unrestricted Resource Consumption | Page size is uncapped, the body limit is 10 MB, the line-item count is unlimited, and there is no rate limit | [`test_api04_resource_consumption.py`](tests/api/test_api04_resource_consumption.py) | `limit` is capped at 1 to 100, the body limit is 16 KB (`413`), orders take at most 20 items, and each user gets 100 requests per minute (`429` + `Retry-After`) |
 | **API5** Broken Function Level Authorization | `/admin/*` checks only that the caller is authenticated | [`test_api05_bfla.py`](tests/api/test_api05_bfla.py) | Role check on the server, using the stored role rather than the token claim |
-| **API6** Unrestricted Access to Sensitive Business Flows | The single-use coupon is checked, then marked redeemed after an `await`, so concurrent requests all win. Negative and huge quantities are accepted | [`test_api06_business_flows.py`](tests/api/test_api06_business_flows.py) | Check and mark happen in one step before any `await`, and quantity must be 1 to 50 |
+| **API6** Unrestricted Access to Sensitive Business Flows | The single-use coupon is checked, then marked redeemed after an `await`, so concurrent requests all win. Negative and huge quantities are accepted | [`test_api06_business_flows.py`](tests/api/test_api06_business_flows.py) | Check and mark happen in one step before any `await`, a code is redeemed once per order owner whoever applies it, each address may register 20 times an hour, and quantity must be 1 to 50 |
 | **API7** Server Side Request Forgery | `POST /files/import` fetches any URL, including `file://`, follows redirects, and accepts credentials in URLs | [`test_api07_ssrf.py`](tests/api/test_api07_ssrf.py) | Exact-origin allowlist, http(s) only, no userinfo, `redirect: 'manual'`, plus timeout and size limits |
 | **API8** Security Misconfiguration | Reflects any CORS origin with credentials, returns stack traces in error bodies, sends `X-Powered-By` and a `Server` version, and sets no hardening headers | [`test_api08_misconfiguration.py`](tests/api/test_api08_misconfiguration.py) | CORS origin allowlist, generic error bodies, and `nosniff`, `no-store`, CSP `frame-ancestors 'none'`, `X-Frame-Options`, HSTS and CORP |
 | **API9** Improper Inventory Management | The undocumented `/api/v0/users` (no auth, full records) and `/debug/config` are still live | [`test_api09_inventory.py`](tests/api/test_api09_inventory.py) | Only documented routes are served. The tests derive shadow-version probes from `/openapi.json` and check that every operation declares security |
@@ -83,18 +83,30 @@ ruff check . && ruff format --check . && mypy
 npm run test:unit && npm run typecheck && npm run lint
 ```
 
+Some API2 and API6 tests act as a second client by connecting from another source address, and each test takes addresses no other test has used. Linux routes all of `127.0.0.0/8` to loopback, so this works out of the box there and in CI. macOS only has `127.0.0.1`, so add aliases once per boot first. Without them those tests error during setup, which fails the run:
+
+```bash
+for n in $(seq 2 20); do sudo ifconfig lo0 alias 127.0.0.$n up; done
+```
+
+When the suite targets an external server (`BASE_URL`), set the same limit variables for the suite as for the target. In particular, `REGISTRATION_LIMIT_PER_HOUR` defaults to `20` on the target but `500` in the suite, which registers many users from one address. If the target throttles those sign-ups, the suite stops with a message naming the variable.
+
 Target configuration (all optional):
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `SECURITY_MODE` | `hardened` | `hardened` or `vulnerable` |
 | `PORT` | `3000` | Listen port. The host is always `127.0.0.1` |
-| `JWT_SECRET` | random per start | HS256 signing key |
+| `JWT_SECRET` | random per start | HS256 signing key, at least 32 characters |
 | `ADMIN_PASSWORD` | random per start | Password for the seeded `admin` account |
 | `UPSTREAM_URL` | `http://127.0.0.1:4010` | Partner and file service (`apisec-upstream` runs the stub) |
 | `IMPORT_ALLOWED_ORIGINS` | origin of `UPSTREAM_URL` | Comma-separated SSRF allowlist |
 | `CORS_ALLOWED_ORIGINS` | `https://app.example.test` | Comma-separated CORS allowlist |
 | `RATE_LIMIT_PER_MINUTE` | `100` | Per-user request budget |
+| `LOGIN_FAILURE_LIMIT_PER_MINUTE` | `20` | Failed logins allowed per client address per minute, across all accounts |
+| `ACCOUNT_FAILURE_LIMIT_PER_HOUR` | `50` | Failed logins per account per hour, across all addresses, before new addresses get `429` |
+| `REGISTRATION_LIMIT_PER_HOUR` | `20` | Registration attempts allowed per client address per hour. The suite raises it to 500 for its own sign-ups |
+| `TRUSTED_ADDRESS_TTL_DAYS` | `30` | How long a successful login keeps that address trusted for that account once the account's failure ceiling is reached |
 
 ## CI pipeline
 
