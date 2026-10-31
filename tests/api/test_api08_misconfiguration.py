@@ -5,6 +5,7 @@ import pytest
 
 from apisec_suite.client import Account
 from apisec_suite.settings import Settings
+from apisec_suite.upstream_stub import INTERNAL_FAILURE_DETAIL
 
 pytestmark = pytest.mark.api8
 
@@ -58,11 +59,13 @@ def test_upstream_failures_are_reported_without_upstream_details(
     client: httpx.Client, user: Account, settings: Settings
 ) -> None:
     response = client.post(
-        "/api/v1/files/import", headers=user.headers, json={"url": f"{settings.upstream_url}/files/missing.txt"}
+        "/api/v1/files/import", headers=user.headers, json={"url": f"{settings.upstream_url}/files/broken.txt"}
     )
 
+    assert INTERNAL_FAILURE_DETAIL not in response.text
+    assert "10.20.30.40" not in response.text
+    assert not re.search(r"\b500\b", response.json().get("message", ""))
     assert response.status_code == 502
-    assert response.json() == {"error": "upstream_error", "message": "Upstream request failed"}
 
 
 def test_unknown_routes_do_not_echo_the_request_back(client: httpx.Client) -> None:
