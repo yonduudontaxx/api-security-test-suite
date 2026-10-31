@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools==84.2.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "api-security-test-suite"
+version = "1.0.0"
+description = "OWASP API Security Top 10 (2023) test suite in pytest, proven against a vulnerable and a hardened API"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Joshua Maigeri" }]
+requires-python = ">=3.12"
+dependencies = [
+  "httpx==0.28.1",
+  "PyJWT==2.15.1",
+  "pytest==9.2.0",
+  "pytest-html==4.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy==2.4.1",
+  "pip-audit==2.10.1",
+  "ruff==0.17.3",
+]
+
+[project.scripts]
+apisec-assert = "apisec_suite.detection:main"
+apisec-upstream = "apisec_suite.upstream_stub:main"
+
+[tool.setuptools]
+packages = ["apisec_suite"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/security"]
+addopts = "-ra --strict-markers --strict-config"
+junit_family = "xunit1"
+filterwarnings = ["error"]
+markers = [
+  "api1: OWASP API1:2023 Broken Object Level Authorization",
+  "api2: OWASP API2:2023 Broken Authentication",
+  "api3: OWASP API3:2023 Broken Object Property Level Authorization",
+  "api4: OWASP API4:2023 Unrestricted Resource Consumption",
+  "api5: OWASP API5:2023 Broken Function Level Authorization",
+  "api6: OWASP API6:2023 Unrestricted Access to Sensitive Business Flows",
+  "api7: OWASP API7:2023 Server Side Request Forgery",
+  "api8: OWASP API8:2023 Security Misconfiguration",
+  "api9: OWASP API9:2023 Improper Inventory Management",
+  "api10: OWASP API10:2023 Unsafe Consumption of APIs",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["node_modules"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "PT", "SIM", "RUF"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["apisec_suite", "tests/security"]

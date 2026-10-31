@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['node_modules', 'playwright-report', 'test-results', 'coverage'] },
+  { ignores: ['node_modules', 'reports', 'coverage', '.venv'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -12,7 +12,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**', 'tests/support/upstream-stub.ts', 'src/server.ts'],
+    files: ['src/server.ts'],
     rules: { 'no-console': 'off' },
   },
 );

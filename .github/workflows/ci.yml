@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
-    name: Typecheck, lint, unit tests, audit
+  target-quality:
+    name: Target API (TypeScript) checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,6 +28,22 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
       - run: npm audit --audit-level=high
+
+  suite-quality:
+    name: Test suite (Python) checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy
+      - run: pip-audit --skip-editable
 
   owasp-suite:
     name: OWASP API Top 10 suite (${{ matrix.mode }} target)
@@ -44,13 +60,19 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - run: npm ci
+      - run: pip install -e .
       - name: Run suite
         id: suite
-        run: npx playwright test
+        run: pytest --junitxml=reports/junit.xml --html=reports/html/index.html --self-contained-html
         continue-on-error: ${{ matrix.mode == 'vulnerable' }}
       - name: Assert every category is ${{ matrix.mode == 'vulnerable' && 'detected' || 'secure' }}
-        run: npx tsx scripts/assert-detection.ts --mode ${{ matrix.mode }}
+        run: apisec-assert --mode ${{ matrix.mode }} --junit reports/junit.xml
       - name: Assert the vulnerable run failed as a whole
         if: matrix.mode == 'vulnerable' && steps.suite.outcome != 'failure'
         run: |
@@ -59,15 +81,13 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: playwright-report-${{ matrix.mode }}
-          path: |
-            playwright-report
-            test-results/results.json
+          name: pytest-report-${{ matrix.mode }}
+          path: reports
           retention-days: 14
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         if: matrix.mode == 'hardened' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
-          path: playwright-report
+          path: reports/html
 
   publish-report:
     name: Publish hardened report to Pages

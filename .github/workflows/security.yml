@@ -22,7 +22,7 @@ jobs:
       image: semgrep/semgrep:1.183.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: semgrep scan --config p/owasp-top-ten --config p/typescript --sarif --output semgrep.sarif --metrics off
+      - run: semgrep scan --config p/owasp-top-ten --config p/typescript --config p/python --sarif --output semgrep.sarif --metrics off
       - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         if: always()
         with:
@@ -66,14 +66,20 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - run: npm ci
+      - run: pip install -e .
       - name: Generate ephemeral secrets
         run: |
           echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
           echo "ADMIN_PASSWORD=$(openssl rand -base64 24)" >> "$GITHUB_ENV"
       - name: Launch services
         run: |
-          nohup npx tsx tests/support/upstream-stub.ts > upstream.log 2>&1 &
+          nohup apisec-upstream > upstream.log 2>&1 &
           nohup npx tsx src/server.ts > api.log 2>&1 &
           for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:3000/health && curl -sf http://127.0.0.1:4010/health && exit 0
