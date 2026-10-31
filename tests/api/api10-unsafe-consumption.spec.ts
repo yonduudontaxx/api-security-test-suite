@@ -16,6 +16,14 @@ test.describe('API10:2023 Unsafe Consumption of APIs', { tag: '@API10' }, () => 
     });
   });
 
+  test('an upstream error is not relayed as a successful response', async ({ request }) => {
+    const user = await createUser(request);
+
+    const response = await request.get('/api/v1/partners/unknown-partner', { headers: bearer(user.token) });
+
+    expect(response.status()).toBe(404);
+  });
+
   test('upstream data failing validation is not relayed to clients', async ({ request }) => {
     const user = await createUser(request);
 

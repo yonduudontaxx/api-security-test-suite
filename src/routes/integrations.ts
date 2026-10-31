@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { currentUser, type AppContext } from '../context.js';
-import { ApiError, badRequest } from '../errors.js';
+import { ApiError, badRequest, notFound } from '../errors.js';
 import { fetchWithLimits, OutboundError, type OutboundResponse } from '../security/outbound.js';
 import { assertOutboundUrlAllowed } from '../security/url-guard.js';
 import { asObject, parsePartnerProfile } from '../validation.js';
@@ -81,6 +81,7 @@ export function registerIntegrationRoutes(app: FastifyInstance, ctx: AppContext)
         maxBytes: PARTNER_MAX_BYTES,
       });
     } catch (error) {
+      if (error instanceof OutboundError && error.upstreamStatus === 404) throw notFound('Partner');
       throw toApiError(error, new ApiError(502, 'upstream_error', 'Upstream redirects are not followed'));
     }
     try {

@@ -1,9 +1,11 @@
 export class OutboundError extends Error {
   readonly reason: 'redirect' | 'status' | 'too_large' | 'timeout' | 'network';
+  readonly upstreamStatus: number | undefined;
 
-  constructor(reason: OutboundError['reason'], message: string) {
+  constructor(reason: OutboundError['reason'], message: string, upstreamStatus?: number) {
     super(message);
     this.reason = reason;
+    this.upstreamStatus = upstreamStatus;
   }
 }
 
@@ -45,7 +47,7 @@ export async function fetchWithLimits(
   }
   if (!response.ok) {
     await response.body?.cancel();
-    throw new OutboundError('status', `Upstream responded with ${response.status}`);
+    throw new OutboundError('status', `Upstream responded with ${response.status}`, response.status);
   }
   try {
     const body = await readLimited(response, options.maxBytes);

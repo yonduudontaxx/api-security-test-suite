@@ -160,6 +160,7 @@ export function buildOpenApiDocument(config: AppConfig) {
           responses: {
             '200': { description: 'Validated partner profile', ...json(ref('Partner')) },
             '400': error('Invalid partner id'),
+            '404': error('Partner not found'),
             '502': error('Upstream returned invalid data'),
             '504': error('Upstream timed out'),
             ...authErrors,
