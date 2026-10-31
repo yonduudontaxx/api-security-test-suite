@@ -54,17 +54,21 @@ class SourceAddressPool:
         self._fallback: Iterator[str] | None = None
         self._issued: set[str] = {host}
 
-    def _candidates(self) -> Iterator[str]:
-        yield from self._loopback
-        if self._fallback is None:
-            self._fallback = iter(_local_ipv4_addresses())
-        yield from self._fallback
-
-    def take(self) -> str:
-        for address in self._candidates():
+    def _next_reachable(self, candidates: Iterator[str]) -> str | None:
+        for address in candidates:
             if address not in self._issued and _reaches(address, self._target):
                 self._issued.add(address)
                 return address
+        return None
+
+    def take(self) -> str:
+        address = self._next_reachable(self._loopback)
+        if address is None:
+            if self._fallback is None:
+                self._fallback = iter(_local_ipv4_addresses())
+            address = self._next_reachable(self._fallback)
+        if address is not None:
+            return address
         raise RuntimeError(
             f"Ran out of distinct source addresses that can reach {self._target[0]}:{self._target[1]}. "
             "Linux routes all of 127.0.0.0/8 to loopback; on macOS add aliases with "
