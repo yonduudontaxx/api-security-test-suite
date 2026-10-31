@@ -10,7 +10,7 @@
 
 ## Known gaps in hardened mode
 
-- Login is protected by a per-account lockout (5 failures, then 15 minutes). There is no per-IP throttle, so password spraying across many accounts is not rate limited. In a deployed service this belongs at the gateway or WAF.
+- Login is protected by a lockout keyed on account and client address (5 failures, then 15 minutes) and a per-address throttle on failed logins across all accounts (20 a minute). A distributed attacker with many addresses still gets 5 guesses per account per address every 15 minutes. In a deployed service, credential-stuffing defences across addresses belong at the gateway or WAF.
 - State such as users, lockouts, rate-limit windows and coupon redemptions is held in memory for a single process. It is not shared across instances.
 
 ## Reporting a vulnerability

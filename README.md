@@ -51,7 +51,7 @@ flowchart LR
 | OWASP API 2023 | Seeded flaw (`vulnerable`) | Tests | Fix (`hardened`) |
 | --- | --- | --- | --- |
 | **API1** Broken Object Level Authorization | Orders are fetched, cancelled and discounted by ID with no owner check, and `?ownerId=` lists another user's orders | [`test_api01_bola.py`](tests/api/test_api01_bola.py) | Lookups are scoped to the caller (or admin). Foreign IDs return `404`, not `403`, so IDs cannot be enumerated |
-| **API2** Broken Authentication | Accepts `alg=none` in any casing, ignores `exp`, has no login lockout, and returns different errors for unknown users and wrong passwords | [`test_api02_broken_authentication.py`](tests/api/test_api02_broken_authentication.py) | Pins HS256, compares signatures in constant time, requires `exp`/`iat` and rejects future `iat`, locks an account for 15 minutes after 5 failures, and gives one generic error |
+| **API2** Broken Authentication | Accepts `alg=none` in any casing, ignores `exp`, has no login lockout, and returns different errors for unknown users and wrong passwords | [`test_api02_broken_authentication.py`](tests/api/test_api02_broken_authentication.py) | Pins HS256, compares signatures in constant time, requires `exp`/`iat` and rejects future `iat`, locks an account for 15 minutes after 5 failures from the same address (so an attacker elsewhere cannot lock the owner out), throttles each address after 20 failed logins a minute across all accounts, and gives one generic error |
 | **API3** Broken Object Property Level Authorization | Responses include `passwordHash`, `resetToken` and `mfaSecret`. `PATCH /users/me` and register accept `role` and `balanceCents` | [`test_api03_bopla.py`](tests/api/test_api03_bopla.py) | Separate private and public views, plus input allowlists that reject unknown fields |
 | **API4** Unrestricted Resource Consumption | Page size is uncapped, the body limit is 10 MB, the line-item count is unlimited, and there is no rate limit | [`test_api04_resource_consumption.py`](tests/api/test_api04_resource_consumption.py) | `limit` is capped at 1 to 100, the body limit is 16 KB (`413`), orders take at most 20 items, and each user gets 100 requests per minute (`429` + `Retry-After`) |
 | **API5** Broken Function Level Authorization | `/admin/*` checks only that the caller is authenticated | [`test_api05_bfla.py`](tests/api/test_api05_bfla.py) | Role check on the server, using the stored role rather than the token claim |
@@ -95,6 +95,7 @@ Target configuration (all optional):
 | `IMPORT_ALLOWED_ORIGINS` | origin of `UPSTREAM_URL` | Comma-separated SSRF allowlist |
 | `CORS_ALLOWED_ORIGINS` | `https://app.example.test` | Comma-separated CORS allowlist |
 | `RATE_LIMIT_PER_MINUTE` | `100` | Per-user request budget |
+| `LOGIN_FAILURE_LIMIT_PER_MINUTE` | `20` | Failed logins allowed per client address per minute, across all accounts |
 
 ## CI pipeline
 

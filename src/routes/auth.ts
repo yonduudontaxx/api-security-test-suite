@@ -9,7 +9,7 @@ import { asObject, parseLogin, parseRegistration } from '../validation.js';
 const DUMMY_HASH = hashPassword('dummy-password-for-timing');
 
 export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void {
-  const { store, config, lockout, hardened } = ctx;
+  const { store, config, lockout, loginLimiter, hardened } = ctx;
 
   app.post('/auth/register', async (request, reply) => {
     if (hardened) {
@@ -35,17 +35,24 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
       return { token: signToken({ sub: user.id, role: user.role }, config.jwtSecret, config.tokenTtlSeconds) };
     }
 
-    const lockedFor = lockout.retryAfterSeconds(username);
+    const throttle = loginLimiter.peek(request.ip);
+    if (!throttle.allowed) {
+      reply.header('retry-after', String(throttle.retryAfterSeconds));
+      throw new ApiError(429, 'rate_limited', 'Too many failed login attempts, try again later');
+    }
+    const lockoutKey = `${request.ip}|${username}`;
+    const lockedFor = lockout.retryAfterSeconds(lockoutKey);
     if (lockedFor > 0) {
       reply.header('retry-after', String(lockedFor));
       throw new ApiError(429, 'account_locked', 'Too many failed attempts, try again later');
     }
     const passwordMatches = verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
     if (!user || !passwordMatches) {
-      lockout.recordFailure(username);
+      lockout.recordFailure(lockoutKey);
+      loginLimiter.hit(request.ip);
       throw new ApiError(401, 'invalid_credentials', 'Invalid username or password');
     }
-    lockout.reset(username);
+    lockout.reset(lockoutKey);
     return { token: signToken({ sub: user.id, role: user.role }, config.jwtSecret, config.tokenTtlSeconds) };
   });
 }

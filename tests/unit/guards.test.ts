@@ -55,6 +55,18 @@ describe('FixedWindowLimiter', () => {
     expect(limiter.hit('k', 1000).allowed).toBe(true);
   });
 
+  it('peek reports the decision for the next hit without counting it', () => {
+    const limiter = new FixedWindowLimiter(2, 1000);
+
+    expect(limiter.peek('k', 0)).toEqual({ allowed: true, retryAfterSeconds: 0 });
+    limiter.hit('k', 0);
+    expect(limiter.peek('k', 1).allowed).toBe(true);
+    limiter.hit('k', 1);
+    expect(limiter.peek('k', 2)).toEqual({ allowed: false, retryAfterSeconds: 1 });
+    expect(limiter.peek('k', 2)).toEqual({ allowed: false, retryAfterSeconds: 1 });
+    expect(limiter.peek('k', 1000)).toEqual({ allowed: true, retryAfterSeconds: 0 });
+  });
+
   it('tracks keys independently', () => {
     const limiter = new FixedWindowLimiter(1, 1000);
     limiter.hit('a', 0);

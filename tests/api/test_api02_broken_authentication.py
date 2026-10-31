@@ -1,6 +1,8 @@
 import base64
 import json
 import secrets
+import uuid
+from collections.abc import Callable
 
 import httpx
 import pytest
@@ -11,6 +13,7 @@ from apisec_suite.settings import Settings
 pytestmark = pytest.mark.api2
 
 ME = "/api/v1/users/me"
+LOGIN = "/api/v1/auth/login"
 
 
 def test_requests_without_a_token_are_rejected(client: httpx.Client) -> None:
@@ -58,6 +61,44 @@ def test_repeated_failed_logins_lock_the_account(client: httpx.Client, user: Acc
 
     assert locked.status_code == 429
     assert locked.headers.get("retry-after")
+
+
+def test_failed_logins_from_another_address_do_not_lock_the_admin_out(
+    client: httpx.Client,
+    client_from: Callable[[str], httpx.Client],
+    other_addresses: list[str],
+    settings: Settings,
+) -> None:
+    attacker = client_from(other_addresses[0])
+    for attempt in range(5):
+        response = attacker.post(LOGIN, json={"username": "admin", "password": f"wrong-{attempt}"})
+        assert response.status_code == 401
+
+    admin = client.post(LOGIN, json={"username": "admin", "password": settings.admin_password})
+    attacker_retry = attacker.post(LOGIN, json={"username": "admin", "password": settings.admin_password})
+
+    assert admin.status_code == 200
+    assert attacker_retry.status_code == 429
+
+
+def test_repeated_failed_logins_from_one_address_are_throttled_across_accounts(
+    client: httpx.Client,
+    client_from: Callable[[str], httpx.Client],
+    other_addresses: list[str],
+    settings: Settings,
+    user: Account,
+) -> None:
+    sprayer = client_from(other_addresses[-1])
+    for _ in range(settings.login_failure_limit):
+        sprayer.post(LOGIN, json={"username": f"ghost-{uuid.uuid4().hex[:8]}", "password": "x" * 16})
+
+    throttled = sprayer.post(LOGIN, json={"username": user.username, "password": user.password})
+    elsewhere = client.post(LOGIN, json={"username": user.username, "password": user.password})
+
+    assert throttled.status_code == 429
+    assert throttled.json()["error"] == "rate_limited"
+    assert int(throttled.headers.get("retry-after", "0")) > 0
+    assert elsewhere.status_code == 200
 
 
 def test_login_errors_do_not_reveal_whether_the_account_exists(client: httpx.Client, user: Account) -> None:

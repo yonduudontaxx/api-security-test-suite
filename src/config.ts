@@ -13,6 +13,7 @@ export interface AppConfig {
   importAllowedOrigins: string[];
   corsAllowedOrigins: string[];
   rateLimitPerMinute: number;
+  loginFailureLimitPerMinute: number;
   maxLoginFailures: number;
 }
 
@@ -43,6 +44,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     importAllowedOrigins: list(env.IMPORT_ALLOWED_ORIGINS, [new URL(upstreamUrl).origin]),
     corsAllowedOrigins: list(env.CORS_ALLOWED_ORIGINS, ['https://app.example.test']),
     rateLimitPerMinute: Number(env.RATE_LIMIT_PER_MINUTE ?? 100),
+    loginFailureLimitPerMinute: Number(env.LOGIN_FAILURE_LIMIT_PER_MINUTE ?? 20),
     maxLoginFailures: 5,
   };
 }

@@ -11,6 +11,7 @@ class Settings:
     jwt_secret: str
     admin_password: str
     mode: str
+    login_failure_limit: int = 20
     allowed_cors_origin: str = "https://app.example.test"
     launch_stack: bool = True
 
@@ -38,5 +39,6 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         jwt_secret=source.get("JWT_SECRET", secrets.token_hex(32)),
         admin_password=source.get("ADMIN_PASSWORD", secrets.token_urlsafe(18)),
         mode=source.get("SECURITY_MODE", "hardened"),
+        login_failure_limit=int(source.get("LOGIN_FAILURE_LIMIT_PER_MINUTE", "20")),
         launch_stack=not external,
     )

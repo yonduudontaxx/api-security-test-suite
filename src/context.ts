@@ -14,6 +14,7 @@ export interface AppContext {
   config: AppConfig;
   store: Store;
   limiter: FixedWindowLimiter;
+  loginLimiter: FixedWindowLimiter;
   lockout: LoginLockout;
   hardened: boolean;
 }

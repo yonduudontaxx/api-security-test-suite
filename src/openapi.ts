@@ -57,7 +57,7 @@ export function buildOpenApiDocument(config: AppConfig) {
             '200': { description: 'Token issued', ...json(ref('Token')) },
             '400': error('Invalid input'),
             '401': error('Invalid username or password'),
-            '429': error('Account temporarily locked'),
+            '429': error('Too many failed login attempts'),
           },
         },
       },

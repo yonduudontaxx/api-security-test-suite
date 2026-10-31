@@ -2,6 +2,7 @@
 
 import base64
 import json
+import socket
 import time
 import uuid
 from dataclasses import dataclass
@@ -21,6 +22,29 @@ class Account:
     @property
     def headers(self) -> dict[str, str]:
         return bearer(self.token)
+
+
+def _local_ipv4_addresses() -> list[str]:
+    try:
+        return [str(info[4][0]) for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)]
+    except OSError:
+        return []
+
+
+def _reaches(source: str, target: tuple[str, int]) -> bool:
+    try:
+        with socket.create_connection(target, timeout=1, source_address=(source, 0)):
+            return True
+    except OSError:
+        return False
+
+
+def alternate_source_addresses(host: str, port: int) -> list[str]:
+    candidates = dict.fromkeys(["127.0.0.2", "127.0.0.3", *_local_ipv4_addresses()])
+    reachable = [address for address in candidates if address != host and _reaches(address, (host, port))]
+    if not reachable:
+        raise RuntimeError(f"No source address other than {host} can reach {host}:{port} to simulate a second client")
+    return reachable[:2]
 
 
 def bearer(token: str) -> dict[str, str]:
