@@ -8,6 +8,11 @@
 - Static analysis (CodeQL, Semgrep) is expected to flag the vulnerable branches in `src/`. Those alerts are triaged as intentional in the code-scanning dashboard; alerts on the hardened branches are treated as real.
 - The default mode is `hardened`.
 
+## Known gaps in hardened mode
+
+- Login is protected by a per-account lockout (5 failures, then 15 minutes). There is no per-IP throttle, so password spraying across many accounts is not rate limited. In a deployed service this belongs at the gateway or WAF.
+- State such as users, lockouts, rate-limit windows and coupon redemptions is held in memory for a single process. It is not shared across instances.
+
 ## Reporting a vulnerability
 
 Report a real issue, such as a hardened-mode flaw, a test that passes against a vulnerable behaviour, a leaked secret or a problem in the CI pipeline, through [GitHub private vulnerability reporting](https://github.com/yonduudontaxx/api-security-test-suite/security/advisories/new). Please do not open a public issue for it.
