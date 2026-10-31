@@ -25,11 +25,12 @@ class Report:
     categories: dict[str, CategoryResult]
     untagged: list[str]
     skipped: list[str]
+    errored: list[str]
 
 
 def parse_junit(path: Path) -> Report:
     root = ET.parse(path).getroot()  # noqa: S314
-    report = Report({key: CategoryResult() for key in CATEGORIES}, [], [])
+    report = Report({key: CategoryResult() for key in CATEGORIES}, [], [], [])
     for case in root.iter("testcase"):
         name = f"{case.get('classname')}::{case.get('name')}"
         category = next(
@@ -38,12 +39,14 @@ def parse_junit(path: Path) -> Report:
         )
         if case.find("skipped") is not None:
             report.skipped.append(name)
+        if case.find("error") is not None:
+            report.errored.append(name)
         if category not in report.categories:
             report.untagged.append(name)
             continue
         result = report.categories[category]
         result.total += 1
-        if case.find("failure") is not None or case.find("error") is not None:
+        if case.find("failure") is not None:
             result.failed.append(name)
     return report
 
@@ -55,6 +58,8 @@ def evaluate(report: Report, mode: str) -> tuple[list[str], list[str]]:
         problems.append(f"Tests without an OWASP category marker: {', '.join(report.untagged)}")
     if report.skipped:
         problems.append(f"Skipped tests are not allowed: {', '.join(report.skipped)}")
+    if report.errored:
+        problems.append(f"Tests errored instead of passing or failing: {', '.join(report.errored)}")
     for key, title in CATEGORIES.items():
         result = report.categories[key]
         failed = len(result.failed)

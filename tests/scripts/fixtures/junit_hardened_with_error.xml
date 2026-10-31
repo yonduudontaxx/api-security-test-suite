@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="1" failures="0" skipped="0" tests="11">
+    <testcase classname="tests.api.test_api1" name="test_setup_error" time="0.01">
+      <properties><property name="owasp_category" value="API1"/></properties>
+      <error message="failed on setup with &quot;RuntimeError: target down&quot;">RuntimeError</error>
+    </testcase>
+    <testcase classname="tests.api.test_api1" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API1"/></properties>
+    </testcase>
+    <testcase classname="tests.api.test_api2" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API2"/></properties>
+    </testcase>
+    <testcase classname="tests.api.test_api3" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API3"/></properties>
+    </testcase>
+    <testcase classname="tests.api.test_api4" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API4"/></properties>
+    </testcase>
+    <testcase classname="tests.api.test_api5" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API5"/></properties>
+    </testcase>
+    <testcase classname="tests.api.test_api6" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API6"/></properties>
+    </testcase>
+    <testcase classname="tests.api.test_api7" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API7"/></properties>
+    </testcase>
+    <testcase classname="tests.api.test_api8" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API8"/></properties>
+    </testcase>
+    <testcase classname="tests.api.test_api9" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API9"/></properties>
+    </testcase>
+    <testcase classname="tests.api.test_api10" name="test_passes" time="0.01">
+      <properties><property name="owasp_category" value="API10"/></properties>
+    </testcase>
+  </testsuite>
+</testsuites>
