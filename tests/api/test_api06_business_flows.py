@@ -4,7 +4,7 @@ from typing import Any
 import httpx
 import pytest
 
-from apisec_suite.client import Account, create_order
+from apisec_suite.client import Account, bearer, create_order
 
 pytestmark = pytest.mark.api6
 
@@ -25,6 +25,17 @@ def test_a_single_use_coupon_cannot_be_redeemed_on_a_second_order(client: httpx.
 
     client.post(f"/api/v1/orders/{first['id']}/coupon", headers=user.headers, json=COUPON)
     reuse = client.post(f"/api/v1/orders/{second['id']}/coupon", headers=user.headers, json=COUPON)
+
+    assert reuse.status_code == 409
+
+
+def test_a_single_use_coupon_cannot_be_redeemed_again_for_the_same_user_by_an_admin(
+    client: httpx.Client, user: Account, admin_token: str
+) -> None:
+    first, second = create_order(client, user), create_order(client, user)
+
+    client.post(f"/api/v1/orders/{first['id']}/coupon", headers=user.headers, json=COUPON)
+    reuse = client.post(f"/api/v1/orders/{second['id']}/coupon", headers=bearer(admin_token), json=COUPON)
 
     assert reuse.status_code == 409
 

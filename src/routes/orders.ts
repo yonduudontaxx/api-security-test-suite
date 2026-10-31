@@ -52,7 +52,7 @@ export function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): void
     if (!coupon) throw notFound('Coupon');
     if (order.couponCode) throw new ApiError(409, 'coupon_already_applied', 'Order already has a coupon');
 
-    const redemptionKey = `${user.id}:${code}`;
+    const redemptionKey = `${hardened ? order.ownerId : user.id}:${code}`;
     if (store.redeemedCoupons.has(redemptionKey)) {
       throw new ApiError(409, 'coupon_already_redeemed', 'Coupon has already been redeemed');
     }
