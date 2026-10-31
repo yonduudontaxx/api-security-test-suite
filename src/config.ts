@@ -23,6 +23,12 @@ function parseMode(value: string | undefined): SecurityMode {
   throw new Error(`SECURITY_MODE must be "vulnerable" or "hardened", got "${value}"`);
 }
 
+function jwtSecret(value: string | undefined): string {
+  if (value === undefined) return randomBytes(32).toString('hex');
+  if (value.length < 32) throw new Error('JWT_SECRET must be at least 32 characters');
+  return value;
+}
+
 function list(value: string | undefined, fallback: string[]): string[] {
   if (!value) return fallback;
   return value
@@ -37,7 +43,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     mode: parseMode(env.SECURITY_MODE),
     host: '127.0.0.1',
     port: Number(env.PORT ?? 3000),
-    jwtSecret: env.JWT_SECRET ?? randomBytes(32).toString('hex'),
+    jwtSecret: jwtSecret(env.JWT_SECRET),
     tokenTtlSeconds: 900,
     adminPassword: env.ADMIN_PASSWORD ?? randomBytes(12).toString('base64url'),
     upstreamUrl,

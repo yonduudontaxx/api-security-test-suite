@@ -54,6 +54,17 @@ def test_malformed_json_produces_a_generic_error_without_internals(client: httpx
     assert not re.search(r"node_modules|\.ts:\d+|at \w+ \(", response.text)
 
 
+def test_upstream_failures_are_reported_without_upstream_details(
+    client: httpx.Client, user: Account, settings: Settings
+) -> None:
+    response = client.post(
+        "/api/v1/files/import", headers=user.headers, json={"url": f"{settings.upstream_url}/files/missing.txt"}
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {"error": "upstream_error", "message": "Upstream request failed"}
+
+
 def test_unknown_routes_do_not_echo_the_request_back(client: httpx.Client) -> None:
     response = client.get("/api/v1/%3Cscript%3Ealert(1)%3C%2Fscript%3E")
 

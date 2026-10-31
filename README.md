@@ -89,7 +89,7 @@ Target configuration (all optional):
 | --- | --- | --- |
 | `SECURITY_MODE` | `hardened` | `hardened` or `vulnerable` |
 | `PORT` | `3000` | Listen port. The host is always `127.0.0.1` |
-| `JWT_SECRET` | random per start | HS256 signing key |
+| `JWT_SECRET` | random per start | HS256 signing key, at least 32 characters |
 | `ADMIN_PASSWORD` | random per start | Password for the seeded `admin` account |
 | `UPSTREAM_URL` | `http://127.0.0.1:4010` | Partner and file service (`apisec-upstream` runs the stub) |
 | `IMPORT_ALLOWED_ORIGINS` | origin of `UPSTREAM_URL` | Comma-separated SSRF allowlist |

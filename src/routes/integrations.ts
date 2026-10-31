@@ -16,7 +16,7 @@ function toApiError(error: unknown, onRedirect: ApiError): ApiError {
   if (!(error instanceof OutboundError)) return new ApiError(502, 'upstream_error', 'Upstream request failed');
   if (error.reason === 'timeout') return new ApiError(504, 'upstream_timeout', 'Upstream timed out');
   if (error.reason === 'redirect') return onRedirect;
-  return new ApiError(502, 'upstream_error', error.message);
+  return new ApiError(502, 'upstream_error', 'Upstream request failed');
 }
 
 async function vulnerableFetch(rawUrl: string): Promise<OutboundResponse> {
