@@ -46,7 +46,8 @@ jobs:
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | tar -xz -C "$RUNNER_TEMP" gitleaks
       - name: Scan git history
-        run: "$RUNNER_TEMP/gitleaks" git --redact --verbose --exit-code 1 --report-format sarif --report-path gitleaks.sarif .
+        run: |
+          "$RUNNER_TEMP/gitleaks" git --redact --verbose --exit-code 1 --report-format sarif --report-path gitleaks.sarif .
       - uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
