@@ -83,6 +83,14 @@ ruff check . && ruff format --check . && mypy
 npm run test:unit && npm run typecheck && npm run lint
 ```
 
+Some API2 and API6 tests act as a second client by connecting from another source address, and each test takes addresses no other test has used. Linux routes all of `127.0.0.0/8` to loopback, so this works out of the box there and in CI. macOS only has `127.0.0.1`, so add aliases once per boot first. Without them those tests error during setup, which fails the run:
+
+```bash
+for n in $(seq 2 20); do sudo ifconfig lo0 alias 127.0.0.$n up; done
+```
+
+When the suite targets an external server (`BASE_URL`), set the same limit variables for the suite as for the target. In particular, `REGISTRATION_LIMIT_PER_HOUR` defaults to `20` on the target but `500` in the suite, which registers many users from one address. If the target throttles those sign-ups, the suite stops with a message naming the variable.
+
 Target configuration (all optional):
 
 | Variable | Default | Purpose |
@@ -98,6 +106,7 @@ Target configuration (all optional):
 | `LOGIN_FAILURE_LIMIT_PER_MINUTE` | `20` | Failed logins allowed per client address per minute, across all accounts |
 | `ACCOUNT_FAILURE_LIMIT_PER_HOUR` | `50` | Failed logins per account per hour, across all addresses, before new addresses get `429` |
 | `REGISTRATION_LIMIT_PER_HOUR` | `20` | Registration attempts allowed per client address per hour. The suite raises it to 500 for its own sign-ups |
+| `TRUSTED_ADDRESS_TTL_DAYS` | `30` | How long a successful login keeps that address trusted for that account once the account's failure ceiling is reached |
 
 ## CI pipeline
 

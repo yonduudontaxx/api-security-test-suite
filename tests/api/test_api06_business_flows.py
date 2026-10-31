@@ -1,5 +1,4 @@
 import uuid
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -59,9 +58,9 @@ def test_concurrent_redemptions_of_a_single_use_coupon_succeed_exactly_once(
 
 
 def test_one_address_cannot_register_accounts_without_limit(
-    client: httpx.Client, client_from_new_address: Callable[[], httpx.Client], settings: Settings
+    client: httpx.Client, client_from_new_address: httpx.Client, settings: Settings
 ) -> None:
-    farmer = client_from_new_address()
+    farmer = client_from_new_address
 
     def attempt(_: int) -> int:
         return farmer.post("/api/v1/auth/register", json={}).status_code

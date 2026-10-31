@@ -1,3 +1,4 @@
+import math
 import os
 from collections.abc import Callable, Iterator
 from contextlib import nullcontext
@@ -8,7 +9,7 @@ import httpx
 import pytest
 
 from apisec_suite import CATEGORIES, CATEGORY_PROPERTY
-from apisec_suite.client import Account, SourceAddressPool, create_user, login
+from apisec_suite.client import SPRAY_FAILURES_PER_ADDRESS, Account, SourceAddressPool, create_user, login
 from apisec_suite.settings import Settings, load_settings
 from apisec_suite.stack import running_stack
 
@@ -40,18 +41,31 @@ def client(settings: Settings) -> Iterator[httpx.Client]:
 
 
 @pytest.fixture(scope="session")
-def client_from_new_address(client: httpx.Client, settings: Settings) -> Iterator[Callable[[], httpx.Client]]:
-    pool = SourceAddressPool(urlsplit(settings.base_url).hostname or "127.0.0.1", settings.api_port)
-    opened: list[httpx.Client] = []
+def address_pool(client: httpx.Client, settings: Settings) -> SourceAddressPool:
+    return SourceAddressPool(urlsplit(settings.base_url).hostname or "127.0.0.1", settings.api_port)
 
-    def factory() -> httpx.Client:
-        transport = httpx.HTTPTransport(local_address=pool.take())
-        session = httpx.Client(base_url=settings.base_url, timeout=10, transport=transport)
-        opened.append(session)
-        return session
 
-    yield factory
-    for session in opened:
+def _clients_from_new_addresses(pool: SourceAddressPool, settings: Settings, count: int) -> list[httpx.Client]:
+    addresses = [pool.take() for _ in range(count)]
+    return [
+        httpx.Client(base_url=settings.base_url, timeout=10, transport=httpx.HTTPTransport(local_address=address))
+        for address in addresses
+    ]
+
+
+@pytest.fixture
+def client_from_new_address(address_pool: SourceAddressPool, settings: Settings) -> Iterator[httpx.Client]:
+    [session] = _clients_from_new_addresses(address_pool, settings, 1)
+    with session:
+        yield session
+
+
+@pytest.fixture
+def account_ceiling_sprayers(address_pool: SourceAddressPool, settings: Settings) -> Iterator[list[httpx.Client]]:
+    count = math.ceil(settings.account_failure_limit / SPRAY_FAILURES_PER_ADDRESS)
+    sessions = _clients_from_new_addresses(address_pool, settings, count)
+    yield sessions
+    for session in sessions:
         session.close()
 
 

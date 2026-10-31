@@ -3,10 +3,10 @@
 import base64
 import json
 import socket
+import threading
 import time
 import uuid
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,16 +27,23 @@ class Account:
 
 
 HOSTNAME_LOOKUP_TIMEOUT_SECONDS = 2
+SPRAY_FAILURES_PER_ADDRESS = 4
 
 
 def _local_ipv4_addresses() -> list[str]:
-    pool = ThreadPoolExecutor(max_workers=1)
-    lookup = pool.submit(socket.getaddrinfo, socket.gethostname(), None, socket.AF_INET)
-    pool.shutdown(wait=False)
-    try:
-        return [str(info[4][0]) for info in lookup.result(timeout=HOSTNAME_LOOKUP_TIMEOUT_SECONDS)]
-    except (OSError, TimeoutError):
-        return []
+    found: list[str] = []
+
+    def lookup() -> None:
+        try:
+            infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+        except OSError:
+            return
+        found.extend(str(info[4][0]) for info in infos)
+
+    worker = threading.Thread(target=lookup, daemon=True)
+    worker.start()
+    worker.join(HOSTNAME_LOOKUP_TIMEOUT_SECONDS)
+    return [] if worker.is_alive() else found
 
 
 def _reaches(source: str, target: tuple[str, int]) -> bool:
@@ -72,7 +79,7 @@ class SourceAddressPool:
         raise RuntimeError(
             f"Ran out of distinct source addresses that can reach {self._target[0]}:{self._target[1]}. "
             "Linux routes all of 127.0.0.0/8 to loopback; on macOS add aliases with "
-            "`sudo ifconfig lo0 alias 127.0.0.N` for N in 2..30."
+            "`for n in $(seq 2 20); do sudo ifconfig lo0 alias 127.0.0.$n up; done` (see README)."
         )
 
 
@@ -94,6 +101,11 @@ def create_user(client: httpx.Client, prefix: str = "user") -> Account:
         "/api/v1/auth/register",
         json={"username": username, "email": f"{username}@example.test", "password": password},
     )
+    if response.status_code == 429:
+        raise RuntimeError(
+            "The target throttled the suite's own registrations. Set REGISTRATION_LIMIT_PER_HOUR on the target "
+            "high enough for the suite's sign-ups from one address (the suite assumes 500)."
+        )
     assert response.status_code == 201, f"register {username}: {response.status_code} {response.text}"
     return Account(response.json()["id"], username, password, login(client, username, password))
 
