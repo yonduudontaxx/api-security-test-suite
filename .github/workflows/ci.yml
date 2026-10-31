@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Typecheck, lint, unit tests, audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: npm audit --audit-level=high
+
+  owasp-suite:
+    name: OWASP API Top 10 suite (${{ matrix.mode }} target)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [hardened, vulnerable]
+    env:
+      SECURITY_MODE: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run suite
+        id: suite
+        run: npx playwright test
+        continue-on-error: ${{ matrix.mode == 'vulnerable' }}
+      - name: Assert every category is ${{ matrix.mode == 'vulnerable' && 'detected' || 'secure' }}
+        run: npx tsx scripts/assert-detection.ts --mode ${{ matrix.mode }}
+      - name: Assert the vulnerable run failed as a whole
+        if: matrix.mode == 'vulnerable' && steps.suite.outcome != 'failure'
+        run: |
+          echo "The suite passed against the vulnerable target, so it detected nothing."
+          exit 1
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.mode }}
+          path: |
+            playwright-report
+            test-results/results.json
+          retention-days: 14
+      - uses: actions/upload-pages-artifact@v5
+        if: matrix.mode == 'hardened' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: playwright-report
+
+  publish-report:
+    name: Publish hardened report to Pages
+    needs: owasp-suite
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

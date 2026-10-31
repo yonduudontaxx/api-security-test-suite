@@ -1,0 +1,119 @@
+name: Security scans
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '41 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: Semgrep SAST (OWASP Top 10)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:1.183.0
+    steps:
+      - uses: actions/checkout@v7
+      - run: semgrep scan --config p/owasp-top-ten --config p/typescript --sarif --output semgrep.sarif --metrics off
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  gitleaks:
+    name: Secret scan (gitleaks, full history)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP" gitleaks
+      - name: Scan git history
+        run: "$RUNNER_TEMP/gitleaks" git --redact --verbose --exit-code 1 --report-format sarif --report-path gitleaks.sarif .
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+  zap:
+    name: OWASP ZAP API scan (hardened target)
+    runs-on: ubuntu-latest
+    env:
+      SECURITY_MODE: hardened
+      RATE_LIMIT_PER_MINUTE: '100000'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Generate ephemeral secrets
+        run: |
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "ADMIN_PASSWORD=$(openssl rand -base64 24)" >> "$GITHUB_ENV"
+      - name: Launch services
+        run: |
+          nohup npx tsx tests/support/upstream-stub.ts > upstream.log 2>&1 &
+          nohup npx tsx src/server.ts > api.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3000/health && curl -sf http://127.0.0.1:4010/health && exit 0
+            sleep 1
+          done
+          cat api.log upstream.log
+          exit 1
+      - name: Obtain a scan identity
+        run: |
+          password="$(openssl rand -hex 16)"
+          curl -sf -X POST http://127.0.0.1:3000/api/v1/auth/register -H 'content-type: application/json' \
+            -d "{\"username\":\"zap-scanner\",\"email\":\"zap@example.test\",\"password\":\"${password}\"}" > /dev/null
+          token="$(curl -sf -X POST http://127.0.0.1:3000/api/v1/auth/login -H 'content-type: application/json' \
+            -d "{\"username\":\"zap-scanner\",\"password\":\"${password}\"}" | jq -r .token)"
+          echo "::add-mask::${token}"
+          {
+            echo "ZAP_AUTH_HEADER=Authorization"
+            echo "ZAP_AUTH_HEADER_VALUE=Bearer ${token}"
+            echo "ZAP_AUTH_HEADER_SITE=127.0.0.1"
+          } >> "$GITHUB_ENV"
+      - uses: zaproxy/action-api-scan@v0.10.0
+        with:
+          target: http://127.0.0.1:3000/openapi.json
+          format: openapi
+          rules_file_name: .zap/rules.tsv
+          cmd_options: -a
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: zap-api-scan
+      - name: Summarise ZAP findings
+        if: always()
+        run: |
+          if [ -f report_json.json ]; then
+            {
+              echo "### OWASP ZAP API scan (hardened target)"
+              echo
+              echo "| Risk | Alert | Instances |"
+              echo "| --- | --- | ---: |"
+              jq -r '.site[].alerts[] | "| \(.riskdesc) | \(.name) | \(.count) |"' report_json.json
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Service logs
+        if: failure()
+        run: cat api.log upstream.log
