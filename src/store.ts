@@ -43,15 +43,13 @@ export interface ImportedFile {
   content: string;
 }
 
-export const catalog: Readonly<Record<string, number>> = {
-  'SKU-BOOK': 1500,
-  'SKU-PEN': 250,
-  'SKU-LAPTOP': 129900,
-};
+export const catalog: ReadonlyMap<string, number> = new Map([
+  ['SKU-BOOK', 1500],
+  ['SKU-PEN', 250],
+  ['SKU-LAPTOP', 129900],
+]);
 
-export const coupons: Readonly<Record<string, { percentOff: number }>> = {
-  WELCOME10: { percentOff: 10 },
-};
+export const coupons: ReadonlyMap<string, { percentOff: number }> = new Map([['WELCOME10', { percentOff: 10 }]]);
 
 export class Store {
   readonly users = new Map<string, User>();

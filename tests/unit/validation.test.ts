@@ -37,6 +37,14 @@ describe('parseOrderItems', () => {
   it('rejects unknown skus', () => {
     expect(() => parseOrderItems({ items: [{ sku: 'SKU-FREE', quantity: 1 }] }, true)).toThrow('Unknown sku');
   });
+
+  it.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'rejects the inherited property name %s as a sku in both modes',
+    (sku) => {
+      expect(() => parseOrderItems({ items: [{ sku, quantity: 1 }] }, true)).toThrow('Unknown sku');
+      expect(() => parseOrderItems({ items: [{ sku, quantity: 1 }] }, false)).toThrow('Unknown sku');
+    },
+  );
 });
 
 describe('mass assignment guards', () => {
