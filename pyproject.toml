@@ -25,14 +25,13 @@ dev = [
 ]
 
 [project.scripts]
-apisec-assert = "apisec_suite.detection:main"
 apisec-upstream = "apisec_suite.upstream_stub:main"
 
 [tool.setuptools]
 packages = ["apisec_suite"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/security"]
+testpaths = ["tests/api"]
 addopts = "-ra --strict-markers --strict-config"
 junit_family = "xunit1"
 filterwarnings = ["error"]
@@ -64,4 +63,4 @@ ignore = ["S101"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["apisec_suite", "tests/security"]
+files = ["apisec_suite", "scripts", "tests/api"]

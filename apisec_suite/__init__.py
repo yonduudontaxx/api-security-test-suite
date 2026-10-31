@@ -1,5 +1,7 @@
 """OWASP API Security Top 10 (2023) test-suite support code."""
 
+CATEGORY_PROPERTY = "owasp_category"
+
 CATEGORIES: dict[str, str] = {
     "API1": "Broken Object Level Authorization",
     "API2": "Broken Authentication",
