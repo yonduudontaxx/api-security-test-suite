@@ -5,6 +5,8 @@ import json
 import socket
 import time
 import uuid
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -24,10 +26,16 @@ class Account:
         return bearer(self.token)
 
 
+HOSTNAME_LOOKUP_TIMEOUT_SECONDS = 2
+
+
 def _local_ipv4_addresses() -> list[str]:
+    pool = ThreadPoolExecutor(max_workers=1)
+    lookup = pool.submit(socket.getaddrinfo, socket.gethostname(), None, socket.AF_INET)
+    pool.shutdown(wait=False)
     try:
-        return [str(info[4][0]) for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)]
-    except OSError:
+        return [str(info[4][0]) for info in lookup.result(timeout=HOSTNAME_LOOKUP_TIMEOUT_SECONDS)]
+    except (OSError, TimeoutError):
         return []
 
 
@@ -39,12 +47,29 @@ def _reaches(source: str, target: tuple[str, int]) -> bool:
         return False
 
 
-def alternate_source_addresses(host: str, port: int) -> list[str]:
-    candidates = dict.fromkeys(["127.0.0.2", "127.0.0.3", *_local_ipv4_addresses()])
-    reachable = [address for address in candidates if address != host and _reaches(address, (host, port))]
-    if not reachable:
-        raise RuntimeError(f"No source address other than {host} can reach {host}:{port} to simulate a second client")
-    return reachable[:2]
+class SourceAddressPool:
+    def __init__(self, host: str, port: int) -> None:
+        self._target = (host, port)
+        self._loopback = (f"127.0.0.{n}" for n in range(2, 255))
+        self._fallback: Iterator[str] | None = None
+        self._issued: set[str] = {host}
+
+    def _candidates(self) -> Iterator[str]:
+        yield from self._loopback
+        if self._fallback is None:
+            self._fallback = iter(_local_ipv4_addresses())
+        yield from self._fallback
+
+    def take(self) -> str:
+        for address in self._candidates():
+            if address not in self._issued and _reaches(address, self._target):
+                self._issued.add(address)
+                return address
+        raise RuntimeError(
+            f"Ran out of distinct source addresses that can reach {self._target[0]}:{self._target[1]}. "
+            "Linux routes all of 127.0.0.0/8 to loopback; on macOS add aliases with "
+            "`sudo ifconfig lo0 alias 127.0.0.N` for N in 2..30."
+        )
 
 
 def bearer(token: str) -> dict[str, str]:

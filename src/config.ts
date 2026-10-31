@@ -14,6 +14,8 @@ export interface AppConfig {
   corsAllowedOrigins: string[];
   rateLimitPerMinute: number;
   loginFailureLimitPerMinute: number;
+  accountFailureLimitPerHour: number;
+  registrationLimitPerHour: number;
   maxLoginFailures: number;
 }
 
@@ -27,6 +29,15 @@ function jwtSecret(value: string | undefined): string {
   if (value === undefined) return randomBytes(32).toString('hex');
   if (value.length < 32) throw new Error('JWT_SECRET must be at least 32 characters');
   return value;
+}
+
+function positiveInteger(name: string, value: string | undefined, fallback: number): number {
+  if (value === undefined) return fallback;
+  const parsed = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive integer, got "${value}"`);
+  }
+  return parsed;
 }
 
 function list(value: string | undefined, fallback: string[]): string[] {
@@ -49,8 +60,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     upstreamUrl,
     importAllowedOrigins: list(env.IMPORT_ALLOWED_ORIGINS, [new URL(upstreamUrl).origin]),
     corsAllowedOrigins: list(env.CORS_ALLOWED_ORIGINS, ['https://app.example.test']),
-    rateLimitPerMinute: Number(env.RATE_LIMIT_PER_MINUTE ?? 100),
-    loginFailureLimitPerMinute: Number(env.LOGIN_FAILURE_LIMIT_PER_MINUTE ?? 20),
+    rateLimitPerMinute: positiveInteger('RATE_LIMIT_PER_MINUTE', env.RATE_LIMIT_PER_MINUTE, 100),
+    loginFailureLimitPerMinute: positiveInteger('LOGIN_FAILURE_LIMIT_PER_MINUTE', env.LOGIN_FAILURE_LIMIT_PER_MINUTE, 20),
+    accountFailureLimitPerHour: positiveInteger('ACCOUNT_FAILURE_LIMIT_PER_HOUR', env.ACCOUNT_FAILURE_LIMIT_PER_HOUR, 50),
+    registrationLimitPerHour: positiveInteger('REGISTRATION_LIMIT_PER_HOUR', env.REGISTRATION_LIMIT_PER_HOUR, 20),
     maxLoginFailures: 5,
   };
 }

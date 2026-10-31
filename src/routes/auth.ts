@@ -9,10 +9,16 @@ import { asObject, parseLogin, parseRegistration } from '../validation.js';
 const DUMMY_HASH = hashPassword('dummy-password-for-timing');
 
 export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void {
-  const { store, config, lockout, loginLimiter, hardened } = ctx;
+  const { store, config, lockout, loginLimiter, accountLimiter, registrationLimiter, hardened } = ctx;
+  const trustedAddresses = new Set<string>();
 
   app.post('/auth/register', async (request, reply) => {
     if (hardened) {
+      const throttle = registrationLimiter.hit(request.ip);
+      if (!throttle.allowed) {
+        reply.header('retry-after', String(throttle.retryAfterSeconds));
+        throw new ApiError(429, 'rate_limited', 'Too many registrations from this address, try again later');
+      }
       const input = parseRegistration(request.body);
       if (store.findUserByUsername(input.username)) throw new ApiError(409, 'username_taken', 'Username is not available');
       return reply.code(201).send(privateView(store.createUser(input)));
@@ -46,13 +52,20 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
       reply.header('retry-after', String(lockedFor));
       throw new ApiError(429, 'account_locked', 'Too many failed attempts, try again later');
     }
+    const ceiling = accountLimiter.peek(username);
+    if (!ceiling.allowed && !trustedAddresses.has(lockoutKey)) {
+      reply.header('retry-after', String(ceiling.retryAfterSeconds));
+      throw new ApiError(429, 'account_throttled', 'Too many failed attempts for this account, try again later');
+    }
     const passwordMatches = verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
     if (!user || !passwordMatches) {
       lockout.recordFailure(lockoutKey);
       loginLimiter.hit(request.ip);
+      accountLimiter.hit(username);
       throw new ApiError(401, 'invalid_credentials', 'Invalid username or password');
     }
     lockout.reset(lockoutKey);
+    trustedAddresses.add(lockoutKey);
     return { token: signToken({ sub: user.id, role: user.role }, config.jwtSecret, config.tokenTtlSeconds) };
   });
 }

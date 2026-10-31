@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from apisec_suite import CATEGORIES, CATEGORY_PROPERTY
-from apisec_suite.client import Account, alternate_source_addresses, create_user, login
+from apisec_suite.client import Account, SourceAddressPool, create_user, login
 from apisec_suite.settings import Settings, load_settings
 from apisec_suite.stack import running_stack
 
@@ -40,11 +40,12 @@ def client(settings: Settings) -> Iterator[httpx.Client]:
 
 
 @pytest.fixture(scope="session")
-def client_from(settings: Settings) -> Iterator[Callable[[str], httpx.Client]]:
+def client_from_new_address(client: httpx.Client, settings: Settings) -> Iterator[Callable[[], httpx.Client]]:
+    pool = SourceAddressPool(urlsplit(settings.base_url).hostname or "127.0.0.1", settings.api_port)
     opened: list[httpx.Client] = []
 
-    def factory(address: str) -> httpx.Client:
-        transport = httpx.HTTPTransport(local_address=address)
+    def factory() -> httpx.Client:
+        transport = httpx.HTTPTransport(local_address=pool.take())
         session = httpx.Client(base_url=settings.base_url, timeout=10, transport=transport)
         opened.append(session)
         return session
@@ -52,11 +53,6 @@ def client_from(settings: Settings) -> Iterator[Callable[[str], httpx.Client]]:
     yield factory
     for session in opened:
         session.close()
-
-
-@pytest.fixture(scope="session")
-def other_addresses(client: httpx.Client, settings: Settings) -> list[str]:
-    return alternate_source_addresses(urlsplit(settings.base_url).hostname or "127.0.0.1", settings.api_port)
 
 
 @pytest.fixture

@@ -1,3 +1,5 @@
+import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -5,6 +7,7 @@ import httpx
 import pytest
 
 from apisec_suite.client import Account, bearer, create_order
+from apisec_suite.settings import Settings
 
 pytestmark = pytest.mark.api6
 
@@ -53,6 +56,27 @@ def test_concurrent_redemptions_of_a_single_use_coupon_succeed_exactly_once(
 
     assert statuses.count(200) == 1
     assert statuses.count(409) == len(orders) - 1
+
+
+def test_one_address_cannot_register_accounts_without_limit(
+    client: httpx.Client, client_from_new_address: Callable[[], httpx.Client], settings: Settings
+) -> None:
+    farmer = client_from_new_address()
+
+    def attempt(_: int) -> int:
+        return farmer.post("/api/v1/auth/register", json={}).status_code
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        statuses = list(pool.map(attempt, range(settings.registration_limit)))
+    username = f"farm-{uuid.uuid4().hex[:8]}"
+    farmed = farmer.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": f"{username}@example.test", "password": f"Pw-{uuid.uuid4()}"},
+    )
+
+    assert set(statuses) == {400}
+    assert farmed.status_code == 429
+    assert int(farmed.headers.get("retry-after", "0")) > 0
 
 
 @pytest.mark.parametrize("quantity", [-5, 0, 1_000_000])

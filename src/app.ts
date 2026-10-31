@@ -93,6 +93,8 @@ export function buildApp(config: AppConfig): FastifyInstance {
     store: new Store(),
     limiter: new FixedWindowLimiter(config.rateLimitPerMinute, 60_000),
     loginLimiter: new FixedWindowLimiter(config.loginFailureLimitPerMinute, 60_000),
+    accountLimiter: new FixedWindowLimiter(config.accountFailureLimitPerHour, 60 * 60_000),
+    registrationLimiter: new FixedWindowLimiter(config.registrationLimitPerHour, 60 * 60_000),
     lockout: new LoginLockout(config.maxLoginFailures, 15 * 60_000),
     hardened,
   };

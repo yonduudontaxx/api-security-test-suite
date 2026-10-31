@@ -12,6 +12,8 @@ class Settings:
     admin_password: str
     mode: str
     login_failure_limit: int = 20
+    account_failure_limit: int = 50
+    registration_limit: int = 500
     allowed_cors_origin: str = "https://app.example.test"
     launch_stack: bool = True
 
@@ -40,5 +42,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         admin_password=source.get("ADMIN_PASSWORD", secrets.token_urlsafe(18)),
         mode=source.get("SECURITY_MODE", "hardened"),
         login_failure_limit=int(source.get("LOGIN_FAILURE_LIMIT_PER_MINUTE", "20")),
+        account_failure_limit=int(source.get("ACCOUNT_FAILURE_LIMIT_PER_HOUR", "50")),
+        registration_limit=int(source.get("REGISTRATION_LIMIT_PER_HOUR", "500")),
         launch_stack=not external,
     )

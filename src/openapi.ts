@@ -45,6 +45,7 @@ export function buildOpenApiDocument(config: AppConfig) {
             '201': { description: 'Account created', ...json(ref('PrivateUser')) },
             '400': error('Invalid input'),
             '409': error('Username taken'),
+            '429': error('Too many registrations from this address'),
           },
         },
       },

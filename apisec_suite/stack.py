@@ -46,6 +46,8 @@ def running_stack(settings: Settings) -> Iterator[None]:
         "UPSTREAM_URL": settings.upstream_url,
         "CORS_ALLOWED_ORIGINS": settings.allowed_cors_origin,
         "LOGIN_FAILURE_LIMIT_PER_MINUTE": str(settings.login_failure_limit),
+        "ACCOUNT_FAILURE_LIMIT_PER_HOUR": str(settings.account_failure_limit),
+        "REGISTRATION_LIMIT_PER_HOUR": str(settings.registration_limit),
     }
     try:
         with tempfile.TemporaryFile() as log:
