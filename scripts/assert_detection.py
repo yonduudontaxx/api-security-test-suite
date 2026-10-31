@@ -11,9 +11,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from apisec_suite import CATEGORIES
-
-CATEGORY_PROPERTY = "owasp_category"
+from apisec_suite import CATEGORIES, CATEGORY_PROPERTY
 
 
 @dataclass

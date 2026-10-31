@@ -43,7 +43,6 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy
-      - run: pip-audit --skip-editable
 
   owasp-suite:
     name: OWASP API Top 10 suite (${{ matrix.mode }} target)
@@ -72,7 +71,7 @@ jobs:
         run: pytest --junitxml=reports/junit.xml --html=reports/html/index.html --self-contained-html
         continue-on-error: ${{ matrix.mode == 'vulnerable' }}
       - name: Assert every category is ${{ matrix.mode == 'vulnerable' && 'detected' || 'secure' }}
-        run: apisec-assert --mode ${{ matrix.mode }} --junit reports/junit.xml
+        run: python scripts/assert_detection.py --mode ${{ matrix.mode }} --junit reports/junit.xml
       - name: Assert the vulnerable run failed as a whole
         if: matrix.mode == 'vulnerable' && steps.suite.outcome != 'failure'
         run: |

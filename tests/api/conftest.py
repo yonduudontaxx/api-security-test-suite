@@ -6,9 +6,8 @@ from typing import Any
 import httpx
 import pytest
 
-from apisec_suite import CATEGORIES
+from apisec_suite import CATEGORIES, CATEGORY_PROPERTY
 from apisec_suite.client import Account, create_user, login
-from apisec_suite.detection import CATEGORY_PROPERTY
 from apisec_suite.settings import Settings, load_settings
 from apisec_suite.stack import running_stack
 
