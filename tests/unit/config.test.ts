@@ -14,7 +14,7 @@ describe('loadConfig', () => {
     expect(loadConfig({ JWT_SECRET: 'x'.repeat(32) }).jwtSecret).toBe('x'.repeat(32));
   });
 
-  it.each(['RATE_LIMIT_PER_MINUTE', 'LOGIN_FAILURE_LIMIT_PER_MINUTE', 'ACCOUNT_FAILURE_LIMIT_PER_HOUR', 'REGISTRATION_LIMIT_PER_HOUR'])(
+  it.each(['RATE_LIMIT_PER_MINUTE', 'LOGIN_FAILURE_LIMIT_PER_MINUTE', 'ACCOUNT_FAILURE_LIMIT_PER_HOUR', 'REGISTRATION_LIMIT_PER_HOUR', 'TRUSTED_ADDRESS_TTL_DAYS'])(
     'rejects %s values that are not positive integers',
     (name) => {
       for (const value of ['0', '-1', '1.5', 'abc', '', ' 5', '1e3', '99999999999999999999']) {
@@ -29,6 +29,7 @@ describe('loadConfig', () => {
       LOGIN_FAILURE_LIMIT_PER_MINUTE: '8',
       ACCOUNT_FAILURE_LIMIT_PER_HOUR: '9',
       REGISTRATION_LIMIT_PER_HOUR: '10',
+      TRUSTED_ADDRESS_TTL_DAYS: '11',
     });
 
     expect([
@@ -36,6 +37,7 @@ describe('loadConfig', () => {
       config.loginFailureLimitPerMinute,
       config.accountFailureLimitPerHour,
       config.registrationLimitPerHour,
-    ]).toEqual([7, 8, 9, 10]);
+      config.trustedAddressTtlDays,
+    ]).toEqual([7, 8, 9, 10, 11]);
   });
 });

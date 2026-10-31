@@ -16,6 +16,7 @@ export interface AppConfig {
   loginFailureLimitPerMinute: number;
   accountFailureLimitPerHour: number;
   registrationLimitPerHour: number;
+  trustedAddressTtlDays: number;
   maxLoginFailures: number;
 }
 
@@ -64,6 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     loginFailureLimitPerMinute: positiveInteger('LOGIN_FAILURE_LIMIT_PER_MINUTE', env.LOGIN_FAILURE_LIMIT_PER_MINUTE, 20),
     accountFailureLimitPerHour: positiveInteger('ACCOUNT_FAILURE_LIMIT_PER_HOUR', env.ACCOUNT_FAILURE_LIMIT_PER_HOUR, 50),
     registrationLimitPerHour: positiveInteger('REGISTRATION_LIMIT_PER_HOUR', env.REGISTRATION_LIMIT_PER_HOUR, 20),
+    trustedAddressTtlDays: positiveInteger('TRUSTED_ADDRESS_TTL_DAYS', env.TRUSTED_ADDRESS_TTL_DAYS, 30),
     maxLoginFailures: 5,
   };
 }

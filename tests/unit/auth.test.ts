@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config.js';
 
@@ -7,6 +7,7 @@ const ADMIN_PASSWORD = 'unit-test-admin-password';
 let app: FastifyInstance;
 
 afterEach(async () => {
+  vi.useRealTimers();
   await app.close();
 });
 
@@ -16,13 +17,14 @@ function start(env: Record<string, string> = {}): void {
   );
 }
 
-function login(password: string, remoteAddress: string) {
-  return app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/login',
-    payload: { username: 'admin', password },
-    remoteAddress,
-  });
+function login(password: string, remoteAddress: string, username = 'admin') {
+  return app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username, password }, remoteAddress });
+}
+
+async function exhaustAdminCeiling(limit: number): Promise<void> {
+  for (let failure = 0; failure < limit; failure += 1) {
+    expect((await login('wrong-password', `203.0.113.${Math.floor(failure / 4) + 1}`)).statusCode).toBe(401);
+  }
 }
 
 describe('per-account failure ceiling', () => {
@@ -43,6 +45,40 @@ describe('per-account failure ceiling', () => {
     expect(Number(fromNewAddress.headers['retry-after'])).toBeGreaterThan(0);
     expect(Number(fromNewAddress.headers['retry-after'])).toBeLessThanOrEqual(3600);
     expect(fromTrustedAddress.statusCode).toBe(200);
+  });
+
+  it('trusts an address only for the account that logged in from it', async () => {
+    start({ ACCOUNT_FAILURE_LIMIT_PER_HOUR: '8' });
+    const mallory = { username: 'mallory', password: 'mallory-password-1' };
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/register',
+      payload: { ...mallory, email: 'mallory@example.test' },
+      remoteAddress: '192.0.2.66',
+    });
+    expect((await login(mallory.password, '192.0.2.66', mallory.username)).statusCode).toBe(200);
+    await exhaustAdminCeiling(8);
+
+    const adminFromMalloryAddress = await login(ADMIN_PASSWORD, '192.0.2.66');
+
+    expect(adminFromMalloryAddress.statusCode).toBe(429);
+    expect(adminFromMalloryAddress.json()).toMatchObject({ error: 'account_throttled' });
+  });
+
+  it('stops trusting an address once the trust period has passed', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    start({ ACCOUNT_FAILURE_LIMIT_PER_HOUR: '8', TRUSTED_ADDRESS_TTL_DAYS: '30' });
+    expect((await login(ADMIN_PASSWORD, '198.51.100.1')).statusCode).toBe(200);
+    expect((await login(ADMIN_PASSWORD, '198.51.100.2')).statusCode).toBe(200);
+
+    vi.setSystemTime(new Date('2026-01-30T00:00:00Z'));
+    expect((await login(ADMIN_PASSWORD, '198.51.100.2')).statusCode).toBe(200);
+    vi.setSystemTime(new Date('2026-01-31T00:00:01Z'));
+    await exhaustAdminCeiling(8);
+
+    expect((await login(ADMIN_PASSWORD, '198.51.100.1')).statusCode).toBe(429);
+    expect((await login(ADMIN_PASSWORD, '198.51.100.2')).statusCode).toBe(200);
   });
 
   it('does not throttle the account below the ceiling', async () => {

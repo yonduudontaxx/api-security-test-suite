@@ -10,7 +10,8 @@ const DUMMY_HASH = hashPassword('dummy-password-for-timing');
 
 export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void {
   const { store, config, lockout, loginLimiter, accountLimiter, registrationLimiter, hardened } = ctx;
-  const trustedAddresses = new Set<string>();
+  const trustedUntil = new Map<string, number>();
+  const trustTtlMs = config.trustedAddressTtlDays * 24 * 60 * 60_000;
 
   app.post('/auth/register', async (request, reply) => {
     if (hardened) {
@@ -53,7 +54,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
       throw new ApiError(429, 'account_locked', 'Too many failed attempts, try again later');
     }
     const ceiling = accountLimiter.peek(username);
-    if (!ceiling.allowed && !trustedAddresses.has(lockoutKey)) {
+    if (!ceiling.allowed && (trustedUntil.get(lockoutKey) ?? 0) <= Date.now()) {
       reply.header('retry-after', String(ceiling.retryAfterSeconds));
       throw new ApiError(429, 'account_throttled', 'Too many failed attempts for this account, try again later');
     }
@@ -65,7 +66,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
       throw new ApiError(401, 'invalid_credentials', 'Invalid username or password');
     }
     lockout.reset(lockoutKey);
-    trustedAddresses.add(lockoutKey);
+    trustedUntil.set(lockoutKey, Date.now() + trustTtlMs);
     return { token: signToken({ sub: user.id, role: user.role }, config.jwtSecret, config.tokenTtlSeconds) };
   });
 }
