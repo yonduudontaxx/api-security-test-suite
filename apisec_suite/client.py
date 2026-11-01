@@ -7,19 +7,21 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 import jwt
+
+from apisec_suite.secret import Secret
 
 
 @dataclass(frozen=True)
 class Account:
     id: str
     username: str
-    password: str
-    token: str
+    password: str = field(repr=False)
+    token: str = field(repr=False)
 
     @property
     def headers(self) -> dict[str, str]:
@@ -83,20 +85,24 @@ class SourceAddressPool:
         )
 
 
+class AuthorizationHeaders(dict[str, str]):
+    def __repr__(self) -> str:
+        return "{'authorization': '***'}"
+
+
 def bearer(token: str) -> dict[str, str]:
-    return {"authorization": f"Bearer {token}"}
+    return AuthorizationHeaders(authorization=f"Bearer {token}")
 
 
 def login(client: httpx.Client, username: str, password: str) -> str:
     response = client.post("/api/v1/auth/login", json={"username": username, "password": password})
     assert response.status_code == 200, f"login as {username}: {response.status_code} {response.text}"
-    token: str = response.json()["token"]
-    return token
+    return Secret(response.json()["token"])
 
 
 def create_user(client: httpx.Client, prefix: str = "user") -> Account:
     username = f"{prefix}-{uuid.uuid4().hex[:8]}"
-    password = f"Pw-{uuid.uuid4()}"
+    password = Secret(f"Pw-{uuid.uuid4()}")
     response = client.post(
         "/api/v1/auth/register",
         json={"username": username, "email": f"{username}@example.test", "password": password},
