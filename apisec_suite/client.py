@@ -90,7 +90,7 @@ class SourceAddressPool:
 
 class AuthorizationHeaders(dict[str, str]):
     def __repr__(self) -> str:
-        return repr({key: "***" if key == "authorization" else value for key, value in self.items()})
+        return repr({key: "***" if key.lower() == "authorization" else value for key, value in self.items()})
 
 
 def bearer(token: str) -> dict[str, str]:
