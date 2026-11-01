@@ -137,14 +137,14 @@ def claims(sub: str, role: str = "user", issued: int | None = None, ttl: int = 6
 
 
 def sign_hs256(payload: dict[str, Any], key: str) -> str:
-    return jwt.encode(payload, key, algorithm="HS256")
+    return Secret(jwt.encode(payload, key, algorithm="HS256"))
 
 
 def unsigned_token(payload: dict[str, Any], alg: str = "none") -> str:
     if alg == "none":
-        return jwt.encode(payload, None, algorithm="none")
+        return Secret(jwt.encode(payload, None, algorithm="none"))
 
     def segment(value: dict[str, Any]) -> str:
         return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
 
-    return f"{segment({'alg': alg, 'typ': 'JWT'})}.{segment(payload)}."
+    return Secret(f"{segment({'alg': alg, 'typ': 'JWT'})}.{segment(payload)}.")

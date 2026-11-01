@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from apisec_suite.client import SPRAY_FAILURES_PER_ADDRESS, Account, bearer, claims, now, sign_hs256, unsigned_token
+from apisec_suite.secret import Secret
 from apisec_suite.settings import Settings
 
 pytestmark = pytest.mark.api2
@@ -40,7 +41,7 @@ def test_a_token_whose_payload_was_edited_after_signing_is_rejected(client: http
     header, _, signature = user.token.split(".")
     forged = base64.urlsafe_b64encode(json.dumps(claims(user.id, role="admin")).encode()).rstrip(b"=").decode()
 
-    assert client.get(ME, headers=bearer(f"{header}.{forged}.{signature}")).status_code == 401
+    assert client.get(ME, headers=bearer(Secret(f"{header}.{forged}.{signature}"))).status_code == 401
 
 
 def test_an_expired_token_is_rejected_even_with_a_valid_signature(
