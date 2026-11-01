@@ -15,7 +15,7 @@ An automated test suite for the [OWASP API Security Top 10 (2023)](https://owasp
 | [`/vulnerable/`](https://yonduudontaxx.github.io/api-security-test-suite/vulnerable/) | Allure report of the vulnerable run, named "Vulnerable target - failures are detected flaws". Each failed test is a seeded flaw the suite caught |
 | [`/pytest/`](https://yonduudontaxx.github.io/api-security-test-suite/pytest/) | The single-page pytest-html report of the hardened run |
 
-Both Allure reports group tests by OWASP category, under Suites and under Behaviors (epic and feature), and list the trigger, run ID, commit, branch and target mode under Environment. CI rebuilds and republishes them after every push to `main`, every manual run, and once a day at 04:23 UTC.
+Both Allure reports group tests by OWASP category, under Suites and under Behaviors (epic and feature), and list the trigger, run ID, commit, branch and target mode under Environment. CI rebuilds and republishes them after every push to `main`, every manual run on `main`, and once a day at 04:23 UTC.
 
 > [!WARNING]
 > `SECURITY_MODE=vulnerable` is intentionally insecure. It accepts unsigned JWTs, follows SSRF payloads and serves its signing key from `/debug/config`. The server binds to `127.0.0.1` only. Never expose it or deploy it. See [SECURITY.md](SECURITY.md).
@@ -122,7 +122,7 @@ Target configuration (all optional):
 
 | Workflow | What it enforces |
 | --- | --- |
-| [`ci.yml`](.github/workflows/ci.yml) | Target: tsc, ESLint, Vitest, `npm audit --audit-level=high` on Node 22. Suite: ruff, ruff format and mypy `--strict` on Python 3.12. The two-leg OWASP suite matrix, the hardened and vulnerable Allure reports plus the hardened pytest-html report, and publishing them to GitHub Pages on every non-PR run on `main`. Publishing stops if either Allure report has no tests. Also runs daily at 04:23 UTC |
+| [`ci.yml`](.github/workflows/ci.yml) | Target: tsc, ESLint, Vitest, `npm audit --audit-level=high` on Node 22. Suite: ruff, ruff format and mypy `--strict` on Python 3.12. The two-leg OWASP suite matrix, the hardened and vulnerable Allure reports plus the hardened pytest-html report, and publishing them to GitHub Pages on every non-PR run on `main`. Publishing stops if either Allure report has no tests or if the hardened and vulnerable totals differ. Also runs daily at 04:23 UTC |
 | [`security.yml`](.github/workflows/security.yml) | Semgrep (`p/owasp-top-ten`, `p/typescript`, `p/python`) → SARIF, gitleaks over full history → SARIF, `pip-audit` on the Python suite, and an authenticated OWASP ZAP API scan of `/openapi.json` against the hardened target, where any unignored alert fails the job ([rules](.zap/rules.tsv)) |
 | [`codeql.yml`](.github/workflows/codeql.yml) | CodeQL `security-extended` for JavaScript/TypeScript and Python |
 
