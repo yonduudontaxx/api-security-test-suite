@@ -27,6 +27,9 @@ class Account:
     def headers(self) -> dict[str, str]:
         return bearer(self.token)
 
+    def headers_with(self, extra: dict[str, str]) -> dict[str, str]:
+        return AuthorizationHeaders({**self.headers, **extra})
+
 
 HOSTNAME_LOOKUP_TIMEOUT_SECONDS = 2
 SPRAY_FAILURES_PER_ADDRESS = 4
@@ -87,7 +90,7 @@ class SourceAddressPool:
 
 class AuthorizationHeaders(dict[str, str]):
     def __repr__(self) -> str:
-        return "{'authorization': '***'}"
+        return repr({key: "***" if key == "authorization" else value for key, value in self.items()})
 
 
 def bearer(token: str) -> dict[str, str]:

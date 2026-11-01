@@ -46,7 +46,7 @@ def test_cors_preflight_from_the_allowlisted_origin_is_granted(client: httpx.Cli
 def test_malformed_json_produces_a_generic_error_without_internals(client: httpx.Client, user: Account) -> None:
     response = client.post(
         "/api/v1/orders",
-        headers={**user.headers, "content-type": "application/json"},
+        headers=user.headers_with({"content-type": "application/json"}),
         content=b'{"items": [',
     )
 
