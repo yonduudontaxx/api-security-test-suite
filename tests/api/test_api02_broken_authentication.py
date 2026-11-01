@@ -26,7 +26,7 @@ def test_a_valid_token_is_accepted(client: httpx.Client, user: Account) -> None:
 
 @pytest.mark.parametrize("alg", ["none", "None", "NONE"])
 def test_an_unsigned_token_is_rejected(client: httpx.Client, user: Account, alg: str) -> None:
-    token = unsigned_token(claims(user.id, role="admin"), alg=alg)
+    token = Secret(unsigned_token(claims(user.id, role="admin"), alg=alg))
 
     assert client.get(ME, headers=bearer(token)).status_code == 401
 

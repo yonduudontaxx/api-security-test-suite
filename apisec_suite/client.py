@@ -142,9 +142,9 @@ def sign_hs256(payload: dict[str, Any], key: str) -> str:
 
 def unsigned_token(payload: dict[str, Any], alg: str = "none") -> str:
     if alg == "none":
-        return Secret(jwt.encode(payload, None, algorithm="none"))
+        return jwt.encode(payload, None, algorithm="none")
 
     def segment(value: dict[str, Any]) -> str:
         return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
 
-    return Secret(f"{segment({'alg': alg, 'typ': 'JWT'})}.{segment(payload)}.")
+    return f"{segment({'alg': alg, 'typ': 'JWT'})}.{segment(payload)}."
