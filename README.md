@@ -116,7 +116,7 @@ Target configuration (all optional):
 | `LOGIN_FAILURE_LIMIT_PER_MINUTE` | `20` | Failed logins allowed per client address per minute, across all accounts |
 | `ACCOUNT_FAILURE_LIMIT_PER_HOUR` | `50` | Failed logins per account per hour, across all addresses, before new addresses get `429` |
 | `REGISTRATION_LIMIT_PER_HOUR` | `20` | Registration attempts allowed per client address per hour. The suite raises it to 500 for its own sign-ups |
-| `TRUSTED_ADDRESS_TTL_DAYS` | `30` | How long a successful login keeps that address trusted for that account once the account's failure ceiling is reached |
+| `TRUSTED_ADDRESS_TTL_DAYS` | `30` | How long a successful login keeps that address trusted for that account once the account's failure ceiling is reached. 1 to 365; a larger value stops the target at startup |
 
 ## CI pipeline
 

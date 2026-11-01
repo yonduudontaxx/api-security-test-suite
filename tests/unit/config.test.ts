@@ -40,4 +40,13 @@ describe('loadConfig', () => {
       config.trustedAddressTtlDays,
     ]).toEqual([7, 8, 9, 10, 11]);
   });
+
+  it('caps TRUSTED_ADDRESS_TTL_DAYS at 365', () => {
+    expect(loadConfig({ TRUSTED_ADDRESS_TTL_DAYS: '365' }).trustedAddressTtlDays).toBe(365);
+    for (const value of ['366', '1000']) {
+      expect(() => loadConfig({ TRUSTED_ADDRESS_TTL_DAYS: value })).toThrow(
+        `TRUSTED_ADDRESS_TTL_DAYS must be at most 365, got "${value}"`,
+      );
+    }
+  });
 });

@@ -32,12 +32,13 @@ function jwtSecret(value: string | undefined): string {
   return value;
 }
 
-function positiveInteger(name: string, value: string | undefined, fallback: number): number {
+function positiveInteger(name: string, value: string | undefined, fallback: number, max = Number.MAX_SAFE_INTEGER): number {
   if (value === undefined) return fallback;
   const parsed = Number(value);
   if (!/^\d+$/.test(value) || !Number.isSafeInteger(parsed) || parsed < 1) {
     throw new Error(`${name} must be a positive integer, got "${value}"`);
   }
+  if (parsed > max) throw new Error(`${name} must be at most ${max}, got "${value}"`);
   return parsed;
 }
 
@@ -65,7 +66,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     loginFailureLimitPerMinute: positiveInteger('LOGIN_FAILURE_LIMIT_PER_MINUTE', env.LOGIN_FAILURE_LIMIT_PER_MINUTE, 20),
     accountFailureLimitPerHour: positiveInteger('ACCOUNT_FAILURE_LIMIT_PER_HOUR', env.ACCOUNT_FAILURE_LIMIT_PER_HOUR, 50),
     registrationLimitPerHour: positiveInteger('REGISTRATION_LIMIT_PER_HOUR', env.REGISTRATION_LIMIT_PER_HOUR, 20),
-    trustedAddressTtlDays: positiveInteger('TRUSTED_ADDRESS_TTL_DAYS', env.TRUSTED_ADDRESS_TTL_DAYS, 30),
+    trustedAddressTtlDays: positiveInteger('TRUSTED_ADDRESS_TTL_DAYS', env.TRUSTED_ADDRESS_TTL_DAYS, 30, 365),
     maxLoginFailures: 5,
   };
 }
