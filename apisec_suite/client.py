@@ -7,23 +7,28 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 import jwt
+
+from apisec_suite.secret import Secret
 
 
 @dataclass(frozen=True)
 class Account:
     id: str
     username: str
-    password: str
-    token: str
+    password: str = field(repr=False)
+    token: str = field(repr=False)
 
     @property
     def headers(self) -> dict[str, str]:
         return bearer(self.token)
+
+    def headers_with(self, extra: dict[str, str]) -> dict[str, str]:
+        return AuthorizationHeaders({**self.headers, **extra})
 
 
 HOSTNAME_LOOKUP_TIMEOUT_SECONDS = 2
@@ -83,20 +88,24 @@ class SourceAddressPool:
         )
 
 
+class AuthorizationHeaders(dict[str, str]):
+    def __repr__(self) -> str:
+        return repr({key: "***" if key.lower() == "authorization" else value for key, value in self.items()})
+
+
 def bearer(token: str) -> dict[str, str]:
-    return {"authorization": f"Bearer {token}"}
+    return AuthorizationHeaders(authorization=f"Bearer {token}")
 
 
 def login(client: httpx.Client, username: str, password: str) -> str:
     response = client.post("/api/v1/auth/login", json={"username": username, "password": password})
     assert response.status_code == 200, f"login as {username}: {response.status_code} {response.text}"
-    token: str = response.json()["token"]
-    return token
+    return Secret(response.json()["token"])
 
 
 def create_user(client: httpx.Client, prefix: str = "user") -> Account:
     username = f"{prefix}-{uuid.uuid4().hex[:8]}"
-    password = f"Pw-{uuid.uuid4()}"
+    password = Secret(f"Pw-{uuid.uuid4()}")
     response = client.post(
         "/api/v1/auth/register",
         json={"username": username, "email": f"{username}@example.test", "password": password},
@@ -131,7 +140,7 @@ def claims(sub: str, role: str = "user", issued: int | None = None, ttl: int = 6
 
 
 def sign_hs256(payload: dict[str, Any], key: str) -> str:
-    return jwt.encode(payload, key, algorithm="HS256")
+    return Secret(jwt.encode(payload, key, algorithm="HS256"))
 
 
 def unsigned_token(payload: dict[str, Any], alg: str = "none") -> str:

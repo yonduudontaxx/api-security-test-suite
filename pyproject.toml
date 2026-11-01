@@ -11,6 +11,7 @@ license = "MIT"
 authors = [{ name = "Joshua Maigeri" }]
 requires-python = ">=3.12"
 dependencies = [
+  "allure-pytest==2.16.2",
   "httpx==0.28.1",
   "PyJWT==2.15.1",
   "pytest==9.2.0",

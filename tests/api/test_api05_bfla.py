@@ -31,6 +31,6 @@ def test_a_regular_user_cannot_delete_accounts_through_the_admin_api(
 def test_admin_functions_are_not_reachable_through_a_method_override_header(
     client: httpx.Client, user: Account
 ) -> None:
-    response = client.get("/api/v1/admin/users", headers={**user.headers, "x-http-method-override": "DELETE"})
+    response = client.get("/api/v1/admin/users", headers=user.headers_with({"x-http-method-override": "DELETE"}))
 
     assert response.status_code == 403

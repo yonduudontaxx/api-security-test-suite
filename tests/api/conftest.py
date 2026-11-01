@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 import httpx
 import pytest
+from allure_commons.types import LabelType
 
 from apisec_suite import CATEGORIES, CATEGORY_PROPERTY
 from apisec_suite.client import SPRAY_FAILURES_PER_ADDRESS, Account, SourceAddressPool, create_user, login
@@ -22,6 +23,10 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         if len(categories) != 1:
             raise pytest.UsageError(f"{item.nodeid} needs exactly one OWASP category marker, found {categories}")
         item.user_properties.append((CATEGORY_PROPERTY, categories[0]))
+        category = f"{categories[0]} {CATEGORIES[categories[0]]}"
+        item.add_marker(pytest.mark.allure_label("OWASP API Security Top 10 (2023)", label_type=LabelType.EPIC))
+        item.add_marker(pytest.mark.allure_label(category, label_type=LabelType.FEATURE))
+        item.add_marker(pytest.mark.allure_label(category, label_type=LabelType.PARENT_SUITE))
 
 
 def pytest_html_report_title(report: Any) -> None:

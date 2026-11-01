@@ -3,11 +3,19 @@
 [![CI](https://github.com/yonduudontaxx/api-security-test-suite/actions/workflows/ci.yml/badge.svg)](https://github.com/yonduudontaxx/api-security-test-suite/actions/workflows/ci.yml)
 [![Security scans](https://github.com/yonduudontaxx/api-security-test-suite/actions/workflows/security.yml/badge.svg)](https://github.com/yonduudontaxx/api-security-test-suite/actions/workflows/security.yml)
 [![CodeQL](https://github.com/yonduudontaxx/api-security-test-suite/actions/workflows/codeql.yml/badge.svg)](https://github.com/yonduudontaxx/api-security-test-suite/actions/workflows/codeql.yml)
-[![Report](https://img.shields.io/badge/report-pytest--html-0A9EDC)](https://yonduudontaxx.github.io/api-security-test-suite/)
+[![Reports](https://img.shields.io/badge/reports-Allure%20%2B%20pytest--html-0A9EDC)](https://yonduudontaxx.github.io/api-security-test-suite/)
 
 An automated test suite for the [OWASP API Security Top 10 (2023)](https://owasp.org/API-Security/editions/2023/en/0x11-t10/), written in Python with pytest, httpx and PyJWT. It runs against a small TypeScript/Fastify API that can start in two modes: `vulnerable`, with a seeded flaw for every category, and `hardened`, with each flaw fixed. CI runs the same suite against both. The hardened run must pass every test. The vulnerable run must fail at least one test in every category. If a category's flaw goes undetected, the build fails. That way the pipeline checks the security tests themselves for false positives and false negatives.
 
-**Live report:** <https://yonduudontaxx.github.io/api-security-test-suite/>. This is the pytest-html report from the latest hardened run on `main`.
+**Live reports:** <https://yonduudontaxx.github.io/api-security-test-suite/>. The index links three reports from the latest run on `main`:
+
+| Report | What it shows |
+| --- | --- |
+| [`/hardened/`](https://yonduudontaxx.github.io/api-security-test-suite/hardened/) | Allure report of the hardened run. Every test must pass |
+| [`/vulnerable/`](https://yonduudontaxx.github.io/api-security-test-suite/vulnerable/) | Allure report of the vulnerable run, named "Vulnerable target - failures are detected flaws". Each failed test is a seeded flaw the suite caught |
+| [`/pytest/`](https://yonduudontaxx.github.io/api-security-test-suite/pytest/) | The single-page pytest-html report of the hardened run |
+
+Both Allure reports group tests by OWASP category, under Suites and under Behaviors (epic and feature), and list the trigger, run ID, commit, branch and target mode under Environment. CI rebuilds and republishes them after every push to `main`, every manual run on `main`, and once a day at 04:23 UTC.
 
 > [!WARNING]
 > `SECURITY_MODE=vulnerable` is intentionally insecure. It accepts unsigned JWTs, follows SSRF payloads and serves its signing key from `/debug/config`. The server binds to `127.0.0.1` only. Never expose it or deploy it. See [SECURITY.md](SECURITY.md).
@@ -35,7 +43,8 @@ flowchart LR
   H --> PW
   V --> PW
   PW --> JSON["junit.xml"] --> A["scripts/assert_detection.py<br/>per-category verdict"]
-  H --> R["HTML report → GitHub Pages"]
+  H --> R["Allure + pytest-html reports → GitHub Pages"]
+  V --> R
   S -->|SARIF| CS["Code scanning"]
   C -->|SARIF| CS
   ZAP["ZAP API scan<br/>/openapi.json"] --> API
@@ -79,6 +88,7 @@ SECURITY_MODE=vulnerable pytest --junitxml=reports/junit.xml; python scripts/ass
 
 pytest -m api7                  # one OWASP category
 pytest --html=reports/html/index.html --self-contained-html
+pytest --alluredir=reports/allure-results && npx allure-commandline serve reports/allure-results
 ruff check . && ruff format --check . && mypy
 npm run test:unit && npm run typecheck && npm run lint
 ```
@@ -106,13 +116,13 @@ Target configuration (all optional):
 | `LOGIN_FAILURE_LIMIT_PER_MINUTE` | `20` | Failed logins allowed per client address per minute, across all accounts |
 | `ACCOUNT_FAILURE_LIMIT_PER_HOUR` | `50` | Failed logins per account per hour, across all addresses, before new addresses get `429` |
 | `REGISTRATION_LIMIT_PER_HOUR` | `20` | Registration attempts allowed per client address per hour. The suite raises it to 500 for its own sign-ups |
-| `TRUSTED_ADDRESS_TTL_DAYS` | `30` | How long a successful login keeps that address trusted for that account once the account's failure ceiling is reached |
+| `TRUSTED_ADDRESS_TTL_DAYS` | `30` | How long a successful login keeps that address trusted for that account once the account's failure ceiling is reached. 1 to 365; a larger value stops the target at startup |
 
 ## CI pipeline
 
 | Workflow | What it enforces |
 | --- | --- |
-| [`ci.yml`](.github/workflows/ci.yml) | Target: tsc, ESLint, Vitest, `npm audit --audit-level=high` on Node 22. Suite: ruff, ruff format and mypy `--strict` on Python 3.12. The two-leg OWASP suite matrix, and publishing the hardened pytest-html report to GitHub Pages |
+| [`ci.yml`](.github/workflows/ci.yml) | Target: tsc, ESLint, Vitest, `npm audit --audit-level=high` on Node 22. Suite: ruff, ruff format and mypy `--strict` on Python 3.12. The two-leg OWASP suite matrix, the hardened and vulnerable Allure reports plus the hardened pytest-html report, and publishing them to GitHub Pages on every non-PR run on `main`. Publishing stops if either Allure report has no tests or if the hardened and vulnerable totals differ. Also runs daily at 04:23 UTC |
 | [`security.yml`](.github/workflows/security.yml) | Semgrep (`p/owasp-top-ten`, `p/typescript`, `p/python`) → SARIF, gitleaks over full history → SARIF, `pip-audit` on the Python suite, and an authenticated OWASP ZAP API scan of `/openapi.json` against the hardened target, where any unignored alert fails the job ([rules](.zap/rules.tsv)) |
 | [`codeql.yml`](.github/workflows/codeql.yml) | CodeQL `security-extended` for JavaScript/TypeScript and Python |
 
