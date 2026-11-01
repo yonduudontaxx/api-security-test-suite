@@ -100,6 +100,7 @@ jobs:
     needs: owasp-suite
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -134,6 +135,8 @@ jobs:
             cat "results/$mode/environment.properties"
           done
       - name: Generate Allure reports
+        env:
+          ALLURE_NO_ANALYTICS: 1
         run: |
           npx --yes allure-commandline@2.46.1 generate results/hardened -o site/hardened --clean \
             --name "Hardened target - every test must pass"
@@ -148,6 +151,8 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          BRANCH_HTML=$(python3 -c 'import html, os; print(html.escape(os.environ["BRANCH"]))')
+          COMMIT_HTML=$(python3 -c 'import html, os; print(html.escape(os.environ["COMMIT"][:7]))')
           cat > site/index.html <<EOF
           <!DOCTYPE html>
           <html lang="en">
@@ -166,7 +171,7 @@ jobs:
           </head>
           <body>
             <h1>API Security Test Suite - Reports</h1>
-            <p>OWASP API Security Top 10 (2023) suite from the latest CI run on <strong>${BRANCH}</strong> (<code>${COMMIT:0:7}</code>).</p>
+            <p>OWASP API Security Top 10 (2023) suite from the latest CI run on <strong>${BRANCH_HTML}</strong> (<code>${COMMIT_HTML}</code>).</p>
             <a href="hardened/">Hardened target (Allure)
               <span>Every test must pass. Grouped by OWASP category</span>
             </a>
@@ -190,6 +195,7 @@ jobs:
     needs: report
     if: ${{ !cancelled() && needs.report.result == 'success' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       pages: write
       id-token: write
@@ -203,11 +209,11 @@ jobs:
           path: site
       - name: Refuse to publish an empty report
         run: |
-          for mode in hardened vulnerable; do
-            total=$(jq -r '.statistic.total // 0' "site/$mode/widgets/summary.json")
-            echo "$mode report contains $total tests"
-            if [ "$total" -lt 1 ]; then echo "::error::The $mode Allure report has no test results; keeping the previously published reports"; exit 1; fi
-          done
+          hardened=$(jq -r '.statistic.total // 0' site/hardened/widgets/summary.json)
+          vulnerable=$(jq -r '.statistic.total // 0' site/vulnerable/widgets/summary.json)
+          echo "hardened report contains $hardened tests, vulnerable report contains $vulnerable tests"
+          if [ "$hardened" -lt 1 ] || [ "$vulnerable" -lt 1 ]; then echo "::error::An Allure report has no test results; keeping the previously published reports"; exit 1; fi
+          if [ "$hardened" -ne "$vulnerable" ]; then echo "::error::The hardened and vulnerable reports ran different numbers of tests; keeping the previously published reports"; exit 1; fi
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
