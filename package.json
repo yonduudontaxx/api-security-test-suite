@@ -16,7 +16,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "fastify": "^5.12.7"
+    "fastify": "^5.12.8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
